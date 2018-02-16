@@ -1,5 +1,9 @@
-DEDA Tracking Dots Extraction, Decoding and Anonymisation Toolkit
+DEDA tracking Dots Extraction, Decoding and Anonymisation toolkit
 =================================================================
+
+Document Colour Tracking Dots or simply yellow dots are small systematic dots in yellow color which encode information about the printer and/or the printout itself. This process is integrated in almost every commercial colour laser printer. This means that almost every printout contains coded information about the source device, such as the serial number. 
+
+On the one hand, this tool gives the possibility to read out and decode these forensic features and on the other hand, it allows anonymization to prevent arbitrary tracking.       
 
 
 #### 1. Reading tracking data   
