@@ -68,8 +68,9 @@ class Main(object):
         """
         if len(pp.validMatrices) > 1:
             print("\nAll valid TDMS:")
-            for tdm in pp.validMatrices:
-                print("\t%s"%str(tdm.decode()))
+            for tdm in set(pp.validMatrices):
+                print("\t%d x %s"%(
+                    pp.validMatrices.count(tdm),str(tdm.decode())))
 
 
 if __name__ == "__main__":
