@@ -28,7 +28,7 @@ if sys.version_info[0] >= 3:
     
 
 WORK_AT_DPI = 300 #300 # resize input to
-HALFTONES_BLUR = 70 # blur factor to get rid of halftones
+HALFTONES_BLUR = 20 #70 # blur factor to get rid of halftones
 COLOUR_THRESHOLD = 233 # transform input to back & white to see printed spots
 YELLOW_GREEDY = ((18,3,214),(39,120,255)) # [Hue, Saturation, Value] range of yellow dots #((16,), [42,67,...])
 YELLOW_STRICT = ((16,10,214),(42,67,255))
