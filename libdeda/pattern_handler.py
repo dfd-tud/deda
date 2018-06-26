@@ -431,7 +431,7 @@ class TDM(object):
             else cropped
         
     def __getattr__(self, name):
-        return getattr(parser,name)(self.m)
+        return getattr(self.parser,name)(self.m)
         
     def decode(self):
         return self.parser.decode(self.cropped)
