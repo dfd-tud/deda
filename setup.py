@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='deda',
-      version='1.0-beta1',
+      version='1.0-beta2',
       python_requires='>=3.3',
       description='tracking Dots Extraction, Decoding and Anonymisation toolkit',
       long_description=long_description,
@@ -12,7 +12,7 @@ setup(name='deda',
       url='https://github.com/dfd-tud/deda',
       author='Timo Richter',
       author_email='timo.juez@gmail.com',
-      license='GNU GPL 3',
+      license='GNU General Public License v3 or later (GPLv3+)',
       packages=['libdeda'],
       install_requires=[
           'numpy', 'opencv-python', 'argparse', 'scipy', 'Pillow'
@@ -25,6 +25,12 @@ setup(name='deda',
         'deda_parse_print = bin.deda_parse_print:main',
       ]},
       include_package_data=True,
-      zip_safe=False
+      zip_safe=False,
+      classifiers=(
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+        "Topic :: Scientific/Engineering :: Information Analysis",
+        "Topic :: Printing",
+      ),
 )
 
