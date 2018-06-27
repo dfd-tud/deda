@@ -1,10 +1,14 @@
 from setuptools import setup
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 setup(name='deda',
       version='1.0-beta1',
       python_requires='>=3.3',
       description='tracking Dots Extraction, Decoding and Anonymisation toolkit',
+      long_description=long_description,
+      long_description_content_type="text/markdown",
       url='https://github.com/dfd-tud/deda',
       author='Timo Richter',
       author_email='timo.juez@gmail.com',
