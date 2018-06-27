@@ -425,8 +425,10 @@ class TDM(object):
         self.atY = atY
         self.parser = patterns[pattern]
         self.trans = trans
-        self.aligned = aligned or self.parser.applyTransformation(m,self.trans)
-        self.cropped = cropped or self.parser.crop(self.aligned)
+        self.aligned = self.parser.applyTransformation(m,self.trans) if \
+            aligned is None else aligned
+        self.cropped = self.parser.crop(self.aligned) if cropped is None \
+            else cropped
         
     def __getattr__(self, name):
         return getattr(self.parser,name)
