@@ -11,7 +11,10 @@ Timo Richter, Stephan Escher, Dagmar Schönfeld, and Thorsten Strufe. 2018. Fore
 
 #### 0. Install
 
-`$ pip install .`
+* From PyPI:
+`$ pip3 install deda`
+* From current directory:
+`$ pip3 install .`
 
 
 #### 1. Reading tracking data   
