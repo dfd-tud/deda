@@ -62,7 +62,7 @@ class Main(object):
                 print()
 
 
+main = lambda:Main()()
 if __name__ == "__main__":
-    Main()()
-    
+    main()
     

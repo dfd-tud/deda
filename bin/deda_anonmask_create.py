@@ -292,6 +292,7 @@ class TestpageParser(object):
             y_offset=yOffset)
         
 
+main = lambda:Main()()
 if __name__ == "__main__":
-    Main()()
+    main()
     

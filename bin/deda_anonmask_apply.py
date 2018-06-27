@@ -98,6 +98,8 @@ class Main(object):
         ps.close()
         print("Document written to '%s'"%OUTFILE)
 
+
+main = lambda:Main()()
 if __name__ == "__main__":
-    Main()()
+    main()
     

@@ -45,6 +45,7 @@ class Main(object):
         Cleaner(self.args.input)(self.args.output)
         
 
+main = lambda:Main()()
 if __name__ == "__main__":
-    Main()()
+    main()
     

@@ -73,7 +73,7 @@ class Main(object):
                     pp.validMatrices.count(tdm),str(tdm.decode())))
 
 
+main = lambda:Main()()
 if __name__ == "__main__":
-    Main()()
-    
+    main()
     
