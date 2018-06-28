@@ -160,6 +160,7 @@ class PrintParser(object):
     raise YD_Parsing_Error("Cannot detect pattern.",self.yd)
   
   def _get_dxy(self, x,y, pattern):
+        """ Returns avg distance between cell edge and dot """
         #return 0,0
         ni,nj,di,dj = patternDict[pattern]
         di = di*self.yd.imgDpi
