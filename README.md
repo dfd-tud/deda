@@ -19,7 +19,7 @@ Timo Richter, Stephan Escher, Dagmar Schönfeld, and Thorsten Strufe. 2018. Fore
 
 #### 1. Reading tracking data   
 
-Tracking data can be read and sometimes be decoded from a scanned image.   
+Tracking data can be read and sometimes be decoded from a scanned image. For good results the input shall use a lossless compression and 300 dpi.
 `$ deda_parse_print INPUTFILE`
 
 
@@ -51,7 +51,7 @@ PDFs can be converted using pdf2ps:
 `$ deda_anonmask_create -w`   
 without any page margin.
 
-* Scan the document and pass the file to   
+* Scan the document (300 dpi) and pass the lossless file to   
 `$ deda_anonmask_create -r INPUTFILE`   
 This creates 'mask.json', the individual printer's anonymisation mask.   
 
