@@ -92,13 +92,15 @@ class _AbstractMatrixParser(_MatrixParserInterface):
             l.append(m)
         return l
 
-    def applyTransformation(self, m, d):
+    @staticmethod
+    def applyTransformation(m, d):
         if d.get("flip"): m=np.fliplr(m)
         if d.get("rot"): m=np.rot90(m,d["rot"])
         m = np.roll(m,(d["x"],d["y"]),(0,1))
         return m
-            
-    def undoTransformation(self, m, d):
+    
+    @staticmethod
+    def undoTransformation(m, d):
         m = np.roll(m,(-d["x"],-d["y"]),(0,1))
         if d.get("rot"): m=np.rot90(m,4-d["rot"])
         if d.get("flip"): m=np.fliplr(m)
