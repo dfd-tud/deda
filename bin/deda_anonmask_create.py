@@ -23,6 +23,7 @@ try:
 except ImportError:
     from PIL import Image
 from libdeda.cmyk_to_rgb import CYAN, MAGENTA, BLACK
+from libdeda.pattern_handler import _AbstractMatrixParser
     
 
 TESTPAGE_SIZE = (8.3, 11.7) # A4, inches
@@ -40,6 +41,7 @@ class Main(object):
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument("-w", "--write", default=False, action='store_true', help='Write calibration page to "%s"'%self.testpage)
         group.add_argument("-r", "--read", type=str, metavar='FILE', help='Read scanned calibration page and create anon mask')
+        parser.add_argument("-c",'--copy', action='store_true', default=False, help='Copy tracking dot pattern instead of anonymising it')
         parser.add_argument("-v",'--verbose', action='count', default=0, help='Fehlerausgabe')
         self.args = parser.parse_args()
 
@@ -50,7 +52,7 @@ class Main(object):
         if self.args.write: 
             TestpageCreator(self.testpage)()
         if self.args.read:
-            TestpageParser(self.args.read)()
+            TestpageParser(self.args.read)(self.args.copy)
         
 
 class TestpageCreator(PSFile):
@@ -108,12 +110,12 @@ class TestpageParser(object):
             sys.stderr.write("Warning: Cannot determine dpi of input. "
                 +"Assuming %f dpi.\n"%self.dpi)
 
-    def __call__(self):
+    def __call__(self, copy=False):
         self.restoreOrientation()
         #cv2.imwrite("orientation.png",self.im)
         #cv2.imwrite("magenta.png",self._selectColour(MAGENTA))
         self.restorePerspective() #FIXME: rotation statt perspective?
-        maskdata = self.createMask()
+        maskdata = self.createMask(copy)
         output = "mask.json"
         print("Writing mask data to '%s'."%output)
         with open(output,"w") as f:
@@ -208,7 +210,7 @@ class TestpageParser(object):
             int(TESTPAGE_SIZE[0]*self.dpi), int(TESTPAGE_SIZE[1]*self.dpi))
         self.im = cv2.warpPerspective(self.im,l,testpageSizePx)
         
-    def createMask(self):
+    def createMask(self, copy):
         """
         Create a mask prototype
         """
@@ -229,8 +231,6 @@ class TestpageParser(object):
                 [abs(e1-tdm.atX)+abs(e2-tdm.atY) for tdm in tdms]
             )] for e1, e2 in edges]
         
-        #m = pp.tdm.undoTransformation()
-        m = pp.tdm.createMask().undoTransformation()
         print("\tTracking dots pattern found:")
         print("\tx=%d, y=%d, trans=%s"%(pp.tdm.atX,pp.tdm.atY,pp.tdm.trans))
         ni,nj,di,dj = patternDict[pp.pattern]
@@ -251,21 +251,25 @@ class TestpageParser(object):
         """
         
         # create mask
-        tdmCorrectionx = pp.tdm.trans["x"]*di
-        tdmCorrectiony = pp.tdm.trans["y"]*dj
-        dots_proto = [((x*di+tdmCorrectionx), (y*dj+tdmCorrectiony))
+        tdm = pp.tdm if copy else pp.tdm.createMask()
+        #m = tdm.aligned
+        #m = tdm.undoTransformation()
+        #m = np.roll(m,(pp.tdm.trans["x"],pp.tdm.trans["y"]),(0,1))
+        m = _AbstractMatrixParser.undoTransformation(tdm.aligned,dict(
+            x=0,y=0,rot=tdm.trans["rot"],flip=tdm.trans["flip"]
+        ))
+        dots_proto = [((x*di), (y*dj))
             for x in range(m.shape[0]) for y in range(m.shape[1]) 
             if m[x,y] == 1]
-        """
-        dots_proto = [
-            ((x*di+pp.tdm.atX/self.dpi),(y*dj+pp.tdm.atY/self.dpi))
-            for x in range(m.shape[0]) for y in range(m.shape[1]) 
-            if m[x,y] == 1]
-        """
-        # FIXME: dont use tdm.trans. instead internal tdm function,
-        # consider rotation/flips
+        
+        # set correct hps,vps for offset patterns
         hps2 = hps/2 if pp.pattern in (1,5,6) else hps
         vps2 = vps/2 if pp.pattern in (1,5,6) else vps
+        
+        # Calc xOffset and yOffset: Distance from (0,0) to the first marking
+        # dots
+        #xOffset = (pp.tdm.atX/pp.yd.imgDpi-pp.tdm.trans["x"]*di)%hps2
+        #yOffset = (pp.tdm.atY/pp.yd.imgDpi-pp.tdm.trans["y"]*dj)%vps2
         
         func = np.median #np.median #np.average
         xOffsets = [(tdm.atX/pp.yd.imgDpi-tdm.trans["x"]*di)%hps2
@@ -276,6 +280,10 @@ class TestpageParser(object):
             for tdm in tdms]
         yOffsets = [e if e>vps2/2 else e+vps2 for e in yOffsets]
         yOffset = func(yOffsets)%vps2
+        
+        if pp.tdm.trans["rot"]%2 == 1:
+            xOffset, yOffset = yOffset, xOffset
+        
         #print(hps,vps)
         #print((np.array(xOffsets)%hps2).tolist(), 
         #    (np.array(yOffsets)%vps2).tolist())
