@@ -50,6 +50,7 @@ class Main(object):
         parser.add_argument("--xoffset", type=float, metavar="INCHES", default=None, help='Manual horizontal TDM offset')
         parser.add_argument("--yoffset", type=float, metavar="INCHES", default=None, help='Manual vertical TDM offset')
         parser.add_argument("--dotradius", type=float, metavar="INCHES", default=DOTRADIUS, help='Dot radius, default=%f'%DOTRADIUS)
+        parser.add_argument("--black", action="store_true", default=False, help='DEBUG: Print dots black instead of yellow')
 
 
         parser.add_argument("mask", type=str, metavar="MASK", help='Path to mask by anonmask_create')
@@ -72,15 +73,18 @@ class Main(object):
         vps = d["vps"]
         xOffset = self.args.xoffset or d["x_offset"]
         yOffset = self.args.yoffset or d["y_offset"]
-        print("TDM offset: %f, %f"%(xOffset, yOffset))
         proto = [(xDot+xOffset,yDot+yOffset) for xDot, yDot in proto]
         
         dotRadius = self.args.dotradius
-        print("Dot radius: %f"%dotRadius)
+        print("Parameters:")
+        print("\tTDM x offset: \t%f"%xOffset)
+        print("\tTDM y offset: \t%f"%yOffset)
+        print("\tDot radius: \t%f"%dotRadius)
         
         ps = PSFile(OUTFILE, margin=0, paper="A4")
         ps.append(PS_PLACE_EPS)
-        ps.append("%d %d %d setrgbcolor"%YELLOW)
+        if self.args.black: ps.append("%d %d %d setrgbcolor"%BLACK)
+        else: ps.append("%d %d %d setrgbcolor"%YELLOW)
         for x_ in range(int(ps.width/hps/dpi+1)):
             for y_ in range(int(ps.height/vps/dpi+1)):
                 for xDot, yDot in proto:
