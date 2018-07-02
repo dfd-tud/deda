@@ -20,12 +20,13 @@ from libdeda.extract_yd import ImgProcessingMixin
 class Cleaner(ImgProcessingMixin):
     _verbosity = 0
     
-    def __call__(self,output):
+    def __call__(self,output,grayscale=False):
         im = cv2.imread(self.path)
         _, mask = self.processImage(im,workAtDpi=None,halftonesBlur=10,
             ydColourRange=((16,1,214),(42,120,255)),
             paperColourThreshold=225)#233
         im[mask==255] = 255
+        if grayscale: im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
         cv2.imwrite(output,im)
         
         
@@ -34,6 +35,7 @@ class Main(object):
     def argparser(self):
         parser = argparse.ArgumentParser(description=
             'Remove Yellow Dots From White Areas of Scanned Pages')
+        parser.add_argument("-g", "--grayscale", default=False, action="store_true", help='Convert output to greyscale (save mode)')
         parser.add_argument("input", type=str, help='Path to Input File')
         parser.add_argument("output", type=str, help='Path to Output File')
         self.args = parser.parse_args()
@@ -42,7 +44,7 @@ class Main(object):
         self.argparser()
     
     def __call__(self):
-        Cleaner(self.args.input)(self.args.output)
+        Cleaner(self.args.input)(self.args.output,self.args.grayscale)
         
 
 main = lambda:Main()()
