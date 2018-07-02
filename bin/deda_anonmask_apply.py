@@ -45,6 +45,10 @@ class Main(object):
 
         with open(self.args.mask) as fp: 
             d = json.load(fp)
+        if d.get("format_ver",0) < 2:
+            raise Exception(("Incompatible format version by mask '%s'. "
+                "Please generate AND print a new calibration page (see "
+                "deda_anonmask_create).")%self.args.mask)
         proto = d["proto"]
         self.hps = d["hps"]
         self.vps = d["vps"]
