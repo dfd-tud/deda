@@ -15,7 +15,8 @@ setup(name='deda',
       license='GNU General Public License v3 or later (GPLv3+)',
       packages=['libdeda'],
       install_requires=[
-          'numpy', 'opencv-python', 'argparse', 'scipy', 'Pillow'
+          'numpy', 'opencv-python', 'argparse', 'scipy', 'Pillow', 'PyPDF2', 
+          'reportlab',
       ],
       entry_points={'console_scripts': [
         'deda_anonmask_apply = bin.deda_anonmask_apply:main',
