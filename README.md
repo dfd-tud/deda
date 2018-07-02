@@ -43,11 +43,9 @@ This (mostly) removes tracking data from a scan:
 
 #### 5. Anonymise a document for printing
 
-* Save your document as a PS file and call it DOCUMENT.PS. 
-PDFs can be converted using pdf2ps:   
-`$ pdf2ps INPUT.PDF OUTPUT.PS`  
+* Save your document as a PDF file and call it DOCUMENT.PDF.
 
-* Print the testpage.ps file created by    
+* Print the testpage.pdf file created by    
 `$ deda_anonmask_create -w`   
 without any page margin.
 
@@ -56,8 +54,8 @@ without any page margin.
 This creates 'mask.json', the individual printer's anonymisation mask.   
 
 * Now apply the anonymisation mask:   
-`$ deda_anonmask_apply mask.json DOCUMENT.PS`   
-This creates 'masked.ps', the anonymised document. It may be printed with a
+`$ deda_anonmask_apply mask.json DOCUMENT.PDF`
+This creates 'masked.pdf', the anonymised document. It may be printed with a
 zero page margin setting.
 
 Check whether a masked page covers your printer's tracking dots by using a 
