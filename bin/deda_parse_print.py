@@ -43,7 +43,8 @@ class Main(object):
         else: pattern = pp.pattern
         
         if pattern is None: 
-                print("No tracking dot pattern detected.")
+                print("No tracking dot pattern detected. For best results "
+                    "try a 300 dpi scan and a lossless file format.")
                 return
         print("Detected pattern %d"%pp.pattern)
         if self.args.only_detect: return
