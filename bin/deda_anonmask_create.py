@@ -15,7 +15,8 @@ the Free Software Foundation, either version 3 of the License, or
 import sys, cv2, argparse, json, random
 import numpy as np
 from colorsys import rgb_to_hsv
-from libdeda.psfile import PSFile
+from reportlab.pdfgen import canvas
+from reportlab.lib import pagesizes
 from libdeda.print_parser import PrintParser, patternDict
 from libdeda.extract_yd import rotateImage, matrix2str
 try:
@@ -26,14 +27,14 @@ from libdeda.cmyk_to_rgb import CYAN, MAGENTA, BLACK
 from libdeda.pattern_handler import _AbstractMatrixParser
     
 
-TESTPAGE_SIZE = (8.3, 11.7) # A4, inches
+TESTPAGE_SIZE = pagesizes.A4
 EDGE_COLOUR = MAGENTA
 EDGE_MARGIN = 2.0/6 # inches
-MARKER_SIZE = 5/72
+MARKER_SIZE = 5.0/72
 
 
 class Main(object):
-    testpage = "testpage.ps"
+    testpage = "testpage.pdf"
 
     def argparser(self):
         parser = argparse.ArgumentParser(
@@ -55,38 +56,40 @@ class Main(object):
             TestpageParser(self.args.read)(self.args.copy)
         
 
-class TestpageCreator(PSFile):
+class TestpageCreator(object):
     dpi=72
     imdpi=600
     
     def __init__(self,filepath):
-        w = TESTPAGE_SIZE[0]*self.dpi
-        h = TESTPAGE_SIZE[1]*self.dpi
-        super(TestpageCreator,self).__init__(filepath,paper=(w,h),margin=0)
-        self.im = np.zeros((int(TESTPAGE_SIZE[1]*self.imdpi),
-            int(TESTPAGE_SIZE[0]*self.imdpi),3))
+        self.filepath = filepath
+        self.c = canvas.Canvas(open(filepath,"wb"), pagesize=TESTPAGE_SIZE)
+        self.im = np.zeros((int(TESTPAGE_SIZE[1]),
+            int(TESTPAGE_SIZE[0]),3))
         self.im[:] = 255
         
     def __call__(self):
-        #self.append("72 %d div dup scale"%self.dpi)
-        self.append("%d %d %d setrgbcolor"%EDGE_COLOUR)
-        for x in [0+EDGE_MARGIN*self.dpi, self.width-EDGE_MARGIN*self.dpi]:
-            for y in [0+EDGE_MARGIN*self.dpi, self.height-EDGE_MARGIN*self.dpi]:
-                self.append("%f %f %f %f rectfill"
-                    %(x,y,MARKER_SIZE*self.dpi,MARKER_SIZE*self.dpi))
-        for x in [0+EDGE_MARGIN*self.imdpi, (TESTPAGE_SIZE[0]-EDGE_MARGIN)*self.imdpi]:
-            for y in [0+EDGE_MARGIN*self.imdpi, (TESTPAGE_SIZE[1]-EDGE_MARGIN)*self.imdpi]:
+        self.c.setFillColorRGB(*EDGE_COLOUR)
+        for x in [0+EDGE_MARGIN*self.dpi, TESTPAGE_SIZE[0]-EDGE_MARGIN*self.dpi]:
+            for y in [0+EDGE_MARGIN*self.dpi, TESTPAGE_SIZE[1]-EDGE_MARGIN*self.dpi]:
+                self.c.rect(x,y,MARKER_SIZE*self.dpi,MARKER_SIZE*self.dpi,
+                    stroke=0, fill=1)
+        for x in [0+EDGE_MARGIN*self.imdpi, (TESTPAGE_SIZE[0]/72-EDGE_MARGIN)*self.imdpi]:
+            for y in [0+EDGE_MARGIN*self.imdpi, (TESTPAGE_SIZE[1]/72-EDGE_MARGIN)*self.imdpi]:
                 self.im[int(y-MARKER_SIZE*self.imdpi)+1:int(y)+1,
                     int(x):int(x+MARKER_SIZE*self.imdpi)] = tuple(reversed(EDGE_COLOUR))
         
-        self.append("%d %d %d setrgbcolor"%CYAN)
-        self.append("%f %f %f %f rectfill"%
-            ((EDGE_MARGIN+MARKER_SIZE)*self.dpi,EDGE_MARGIN*self.dpi,
-            MARKER_SIZE*self.dpi,MARKER_SIZE*self.dpi))
+        self.c.setFillColorRGB(*CYAN)
+        self.c.rect(
+            (EDGE_MARGIN+MARKER_SIZE)*self.dpi,EDGE_MARGIN*self.dpi,
+            MARKER_SIZE*self.dpi,MARKER_SIZE*self.dpi,
+            stroke=0, fill=1)
         self.im[int(-EDGE_MARGIN*self.imdpi-MARKER_SIZE*self.imdpi)+1:int(-EDGE_MARGIN*self.imdpi)+1,
             int(EDGE_MARGIN*self.imdpi+MARKER_SIZE*self.imdpi):int(EDGE_MARGIN*self.imdpi+2*MARKER_SIZE*self.imdpi)] = tuple(reversed(CYAN))
-        self.close()
-        cv2.imwrite("testpage.png",self.im)
+        
+        self.c.showPage()
+        self.c.save()
+        #cv2.imwrite("testpage.png",self.im)
+        print("%s written."%self.filepath)
         #TODO print me
         
 
@@ -106,7 +109,7 @@ class TestpageParser(object):
                 self.dpi = np.average(dpi)
                 if self.dpi == 72: raise ValueError("assuming invalid dpi")
         except (KeyError, ValueError):
-            self.dpi = round(max(self.im.shape)/max(TESTPAGE_SIZE),-2)
+            self.dpi = round(max(self.im.shape)/(max(TESTPAGE_SIZE)/72),-2)
             sys.stderr.write("Warning: Cannot determine dpi of input. "
                 +"Assuming %f dpi.\n"%self.dpi)
 
@@ -184,9 +187,9 @@ class TestpageParser(object):
         inputPoints = self._getMagentaMarkers()
         outputPoints = np.array([(x*self.dpi, y*self.dpi) for x,y in [
             (0+EDGE_MARGIN, 0+EDGE_MARGIN),
-            (0+EDGE_MARGIN, TESTPAGE_SIZE[1]-EDGE_MARGIN),
-            (TESTPAGE_SIZE[0]-EDGE_MARGIN, 0+EDGE_MARGIN),
-            (TESTPAGE_SIZE[0]-EDGE_MARGIN, TESTPAGE_SIZE[1]-EDGE_MARGIN),
+            (0+EDGE_MARGIN, TESTPAGE_SIZE[1]/72-EDGE_MARGIN),
+            (TESTPAGE_SIZE[0]/72-EDGE_MARGIN, 0+EDGE_MARGIN),
+            (TESTPAGE_SIZE[0]/72-EDGE_MARGIN, TESTPAGE_SIZE[1]/72-EDGE_MARGIN),
         ]],dtype=np.float32)
         """
         inputPoints = np.array([
@@ -197,9 +200,9 @@ class TestpageParser(object):
         ], dtype=np.float32)
         outputPoints = np.array([(x*self.dpi, y*self.dpi) for x,y in [
             (0+EDGE_MARGIN, 0+EDGE_MARGIN-MARKER_SIZE),
-            (0+EDGE_MARGIN, TESTPAGE_SIZE[1]-EDGE_MARGIN),
-            (TESTPAGE_SIZE[0]-EDGE_MARGIN+MARKER_SIZE, 0+EDGE_MARGIN-MARKER_SIZE),
-            (TESTPAGE_SIZE[0]-EDGE_MARGIN+MARKER_SIZE, TESTPAGE_SIZE[1]-EDGE_MARGIN),
+            (0+EDGE_MARGIN, TESTPAGE_SIZE[1]/72-EDGE_MARGIN),
+            (TESTPAGE_SIZE[0]/72-EDGE_MARGIN+MARKER_SIZE, 0+EDGE_MARGIN-MARKER_SIZE),
+            (TESTPAGE_SIZE[0]/72-EDGE_MARGIN+MARKER_SIZE, TESTPAGE_SIZE[1]/72-EDGE_MARGIN),
         ]],dtype=np.float32)
         """
         l = cv2.getPerspectiveTransform(inputPoints,outputPoints)
@@ -207,7 +210,7 @@ class TestpageParser(object):
         for (x1,y1),(x2,y2) in zip(inputPoints,outputPoints):
             print("\tMapping %d,%d -> %d,%d"%(x1,y1,x2,y2))
         testpageSizePx = (
-            int(TESTPAGE_SIZE[0]*self.dpi), int(TESTPAGE_SIZE[1]*self.dpi))
+            int(TESTPAGE_SIZE[0]/72*self.dpi), int(TESTPAGE_SIZE[1]/72*self.dpi))
         self.im = cv2.warpPerspective(self.im,l,testpageSizePx)
         
     def createMask(self, copy):
@@ -297,7 +300,7 @@ class TestpageParser(object):
         print("TDM offset: %f, %f"%(xOffset,yOffset))
 
         return dict(proto=dots_proto, hps=hps, vps=vps, x_offset=xOffset,
-            y_offset=yOffset)
+            y_offset=yOffset, format_ver=2)
         
 
 main = lambda:Main()()
