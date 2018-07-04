@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*- 
 '''
+The patterns and their specific functions
 Align all matrices for each translation and do redundance checks
 
 Example: 
@@ -46,6 +47,13 @@ class _MatrixParserInterface(object):
         """
         pass
     
+    @classmethod
+    def applyCopies(self,m):
+        """
+        If @m contains a prototype and copies of it, update the copies
+        """
+        pass
+        
     def crop(self,m): 
         """
         Format the matrix into a specific shape for check() and decode()
@@ -92,12 +100,12 @@ class _AbstractMatrixParser(_MatrixParserInterface):
             l.append(m)
         return l
 
-    @staticmethod
-    def applyTransformation(m, d):
+    @classmethod
+    def applyTransformation(self, m, d):
         if d.get("flip"): m=np.fliplr(m)
         if d.get("rot"): m=np.rot90(m,d["rot"])
         m = np.roll(m,(d["x"],d["y"]),(0,1))
-        return m
+        return self.applyCopies(m)
     
     @staticmethod
     def undoTransformation(m, d):
@@ -105,7 +113,11 @@ class _AbstractMatrixParser(_MatrixParserInterface):
         if d.get("rot"): m=np.rot90(m,4-d["rot"])
         if d.get("flip"): m=np.fliplr(m)
         return m
-            
+    
+    @classmethod
+    def applyCopies(self, m):
+        return m
+        
     def getTransformations(self,m_,empty=[],nempty=[],strict=True,
             allowFlip=False,allowUpsideDown=True,rot=0):
         """
@@ -162,6 +174,11 @@ class Pattern1(_AbstractMatrixParser):
   for e2 in [(3,5,7,9,11,13,15),(0,2,4,6,8,10,12,14)]
   ]
   
+  @classmethod
+  def applyCopies(self,aligned):
+    aligned[16:32,16:32] = aligned[0:16,0:16]
+    return aligned
+  
   def checkAnyRolling(self,m):
     dots = np.sum(m,axis=0)
     return 2 in dots and sum([1 for s in dots if s%2==0]) >= 8
@@ -210,8 +227,7 @@ class Pattern1(_AbstractMatrixParser):
         C_empty = [c for c in C if m[c,r] == 0]
         C_fill = random.sample(C_empty,amountNewDots)
         anon[C_fill,r] = 1
-    anon[16:32,16:32] = anon[0:16,0:16]
-    return anon
+    return self.applyCopies(anon)
     
 
 class Pattern2(_AbstractMatrixParser):
@@ -246,6 +262,14 @@ class Pattern2(_AbstractMatrixParser):
         manufacturer=self.manufacturers.get(blocks[0]))
   
   def createMask(self, m):
+    """ Full mask """
+    anon = np.zeros(m.shape,dtype=np.uint8)
+    for x,y in [z for x in self.blocks for y in x for z in y]:
+        anon[x,y] = 1
+    anon[m==1] = 0
+    return anon
+  
+  def createMaskStrategic(self, m):
     oneHotCodes = [w for words in self.blocks for w in words[0:4]]
     parity = [cell for words in self.blocks for cell in words[4]]
     anon = np.zeros(m.shape,dtype=np.uint8)
@@ -283,16 +307,23 @@ class Pattern3(Pattern2):
 
 class Pattern4(_AbstractMatrixParser):    
 
-  alignment = dict(nempty = [(0,4+1),(0,1+1),(2,1+1)])
+  #alignment = dict(nempty = [(0,4+1),(0,1+1),(2,1+1)])
+  alignment = dict(nempty = [(0,4),(0,1),(2,1)])
   blocks = [[((bx*4+by+x)%24,(3*by+1+y)%16) for y in range(3) for x in range(2)]
         for by in range(5) for bx in range(6) if bx+by>=2]
   
   def checkAnyRolling(self, m):
     return 30 in [np.sum(m[:,0:16]),np.sum(m[:,16:32]),np.sum(m[:,32:48])]
 
+  @classmethod
+  def applyCopies(self, m):
+    m[:,16:32] = np.roll(m[:,0:16],8,0)
+    m[:,32:48] = np.roll(m[:,16:32],8,0)
+    return m
+    
   def crop(self,m):
-    m = m[:,1:16+1]
-    #m = m[:,0:16]
+    #m = m[:,1:16+1]
+    m = m[:,0:16]
     if np.sum(m) != 30: return None
     m = np.array([[m[x,y] for x,y in b] for b in self.blocks])
     return m
@@ -308,16 +339,21 @@ class Pattern4(_AbstractMatrixParser):
         "".join(blocks[0:4]),"".join(blocks[4:9]),"".join(blocks[9:15]),
         "".join(blocks[15:21]),"".join(blocks[21:27]))
     return dict(raw=raw, printer=raw, manufacturer="Konica Minolta/Epson")
-    
-  def createMask(self,m):
+  
+  def createMask(self, m):
+    """ Full mask """
+    anon = np.zeros(m.shape,dtype=np.uint8)
+    for x,y in [y for x in self.blocks for y in x]:
+        anon[x,y] = 1
+    anon[m==1] = 0
+    return self.applyCopies(anon)
+  
+  def createMaskStrategic(self,m):
     anon = np.zeros(m.shape,dtype=np.uint8)
     for b in self.blocks:
         empty = [(x,y) for x,y in b if m[x,y]==0]
         anon[random.choice(empty)] = 1
-    #repetitions
-    anon[:,16:32] = np.roll(anon[:,0:16],8,0)
-    anon[:,32:48] = np.roll(anon[:,16:32],8,0)
-    return anon
+    return self.applyCopies(anon)
 
 
 class Pattern41(Pattern4):
@@ -337,6 +373,11 @@ class Pattern5(_AbstractMatrixParser):
     cols = np.sum(m,axis=1)
     return len([1 for r in rows if r%2==1]) >= 14 \
         and len([1 for c in cols if c%2==1]) >= 7
+  
+  @classmethod
+  def applyCopies(self, m):
+    m[8:16,16:32] = m[0:8,0:16]
+    return m
   
   def crop(self,m):
     m = m[0:8,1:16]
@@ -383,8 +424,7 @@ class Pattern5(_AbstractMatrixParser):
         add = max(1, 4-int(np.sum(m[:,y])))
         anon[random.sample(empty,add),y] = 1
     anon[m==1] == 0
-    anon[8:16,16:32] = anon[0:8,0:16]
-    return anon
+    return self.applyCopies(anon)
 
 
 class Pattern6(Pattern5):
