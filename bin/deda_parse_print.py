@@ -49,7 +49,7 @@ class Main(object):
         print("Detected pattern %d"%pp.pattern)
         if self.args.only_detect: return
 
-        tdm = pp.getValidMatrixFromSheet()
+        tdm = pp.tdm
         if tdm is None: return
         print(tdm)
         mask = tdm.createMask()

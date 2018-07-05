@@ -11,15 +11,8 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 '''
 
-import sys, argparse, json
-import numpy as np; import cv2
-from io import BytesIO
-from PyPDF2 import PdfFileReader, PdfFileWriter
-from reportlab.pdfgen import canvas
-from libdeda.cmyk_to_rgb import BLACK, YELLOW, CYAN
-
-
-DOTRADIUS = 0.004 #in
+import sys, argparse
+from libdeda.privacy import DOTRADIUS, AnonmaskApplier
 
 
 class Main(object):
@@ -41,78 +34,19 @@ class Main(object):
         self.argparser()
     
     def __call__(self):
+        with open(self.args.mask) as fp:
+            aa = AnonmaskApplier(fp.read(), self.args.dotradius, 
+                self.args.xoffset, self.args.yoffset, self.args.black)
         OUTFILE = "masked.pdf"
 
-        with open(self.args.mask) as fp: 
-            d = json.load(fp)
-        if d.get("format_ver",0) < 2:
-            raise Exception(("Incompatible format version by mask '%s'. "
-                "Please generate AND print a new calibration page (see "
-                "deda_anonmask_create).")%self.args.mask)
-        proto = d["proto"]
-        self.hps = d["hps"]
-        self.vps = d["vps"]
-        xOffset = self.args.xoffset or d["x_offset"]
-        yOffset = self.args.yoffset or d["y_offset"]
-        self.proto = [(xDot+xOffset,yDot+yOffset) for xDot, yDot in proto]
-        
-        self.dotRadius = self.args.dotradius
         print("Parameters:")
-        print("\tTDM x offset: \t%f"%xOffset)
-        print("\tTDM y offset: \t%f"%yOffset)
-        print("\tDot radius: \t%f"%self.dotRadius)
+        print("\tTDM x offset: \t%f"%aa.xOffset)
+        print("\tTDM y offset: \t%f"%aa.yOffset)
+        print("\tDot radius: \t%f"%aa.dotRadius)
         
-        pdfWatermark(self.args.page, self.createMask, OUTFILE)
+        with open(OUTFILE,"wb") as pdfout:
+            pdfout.write(aa.apply(self.args.page))
         print("Document written to '%s'"%OUTFILE)
-
-    def createMask(self, w, h):
-        w = float(w)
-        h = float(h)
-        colour = BLACK if self.args.black else YELLOW
-        io = BytesIO()
-        c = canvas.Canvas(io, pagesize=(w,h) )
-        c.setStrokeColorRGB(*colour)
-        c.setFillColorRGB(*colour)
-        for x_ in range(int(w/self.hps/72+1)):
-            for y_ in range(int(h/self.vps/72+1)):
-                for xDot, yDot in self.proto:
-                    x = (x_*self.hps+xDot%self.hps)*72
-                    y = h - (y_*self.vps+yDot%self.vps)*72
-                    if x > w or y > h: continue
-                    c.circle(x,y,self.dotRadius*72,stroke=0,fill=1)
-        c.showPage()
-        c.save()
-        return io
-
-
-def pdfWatermark(infile, maskCreator, outfile):
-    """
-    For each page from infile, maskCreator will be called with its dimensions
-    and shall return a single page PDF to be put on top. The result is
-    written to outfile.
-    @infile String,
-    @maskCreator Function,
-    @outfile String
-    """
-    output = PdfFileWriter()
-    input_ = PdfFileReader(open(infile,"rb"))
-    pageBoxes = [input_.getPage(p_nr).mediaBox
-        for p_nr in range(input_.getNumPages())
-    ]
-    maxWidth = max([b.getWidth() for b in pageBoxes])
-    maxHeight = max([b.getHeight() for b in pageBoxes])
-    maskPdf = maskCreator(maxWidth, maxHeight)
-
-    for p_nr in range(input_.getNumPages()):
-        page = input_.getPage(p_nr)
-        box = page.mediaBox
-        #maskPdf = maskCreator(box.getWidth(),box.getHeight() )
-        maskPage = PdfFileReader(maskPdf).getPage(0)
-        page.mergePage(maskPage)
-        output.addPage(page)
-        
-    with open(outfile,"wb") as f:
-        output.write(f)
 
 
 main = lambda:Main()()
