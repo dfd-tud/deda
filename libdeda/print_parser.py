@@ -196,3 +196,34 @@ class PrintParser(object):
     """
     return self.tdm
 
+
+def comparePrints(files,ppArgs=None):
+        """
+        Compare the origin of a list of scanned documents
+        
+        files: List of Strings,
+        ppArgs: Dict, args for PrintParser init,
+        Returns: (printers list, errors list, identical bool)
+            where printers is a list
+            [{manufacturer: string, files: subset of files}]
+            and errors is a list of the form [(Exception, element of files)]
+            and identical is True if all files come from the same printer.
+        
+        """
+        ppArgs = ppArgs or {}
+        printers = {}
+        errors = []
+        for f in files:
+            try:
+                pp = PrintParser(f, **ppArgs)
+            except Exception as e:
+                errors.append((e,f))
+            else:
+                info = pp.tdm.decode()
+                p = info["printer"]
+                printers[p] = printers.get(p,info)
+                printers[p]["files"] = printers[p].get("files",[])+[f]
+        
+        return (printers.values(), errors, 
+            len(printers) == 1 and len(errors) == 0)
+        

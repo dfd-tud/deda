@@ -10,7 +10,7 @@ the Free Software Foundation, either version 3 of the License, or
 """
 
 import argparse, os, sys
-from libdeda.print_parser import PrintParser
+from libdeda.print_parser import comparePrints
 
 
 class Main(object):
@@ -28,20 +28,10 @@ class Main(object):
         self.argparser()
     
     def __call__(self):
-        printers = {}
-        errors = []
-        for f in self.args.files:
-            try:
-                pp = PrintParser(f, ydxArgs=dict(inputDpi=self.args.dpi), 
-                    verbose=self.args.verbose)
-            except Exception as e:
-                errors.append((e,f))
-            else:
-                info = pp.tdm.decode()
-                p= info["printer"]
-                printers[p] = printers.get(p,[])+[(f,info)]
-        
-        if len(printers) == 1 and len(errors) == 0: 
+        printers, errors, identical = comparePrints(self.args.files, 
+            ppArgs=dict(ydxArgs=dict(inputDpi=self.args.dpi),
+                verbose=self.args.verbose))
+        if identical: 
             print("The printers of the input have been detected as")
             print("\tIDENTICAL.")
             return
@@ -54,10 +44,9 @@ class Main(object):
                 print("%s: %s"%(str(e),f))
             print()
         
-        for i, (printerId, filesinfo) in enumerate(printers.items()):
-                info = filesinfo[0][1]
-                print("Printer #%d: %s"%(i+1,info["manufacturer"]))
-                for f, info in filesinfo:
+        for i, p in enumerate(printers):
+                print("Printer #%d: %s"%(i+1,p["manufacturer"]))
+                for f in p["files"]:
                     print("%s"%f)
                 print()
 
