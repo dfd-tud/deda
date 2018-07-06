@@ -15,6 +15,7 @@ import numpy as np
 from io import BytesIO
 try: import Image
 except ImportError: from PIL import Image
+import libdeda.pypdf2patch
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib import pagesizes
@@ -24,6 +25,8 @@ from libdeda.extract_yd import rotateImage, matrix2str, ImgProcessingMixin
 from libdeda.cmyk_to_rgb import CYAN, MAGENTA, BLACK, YELLOW
 from libdeda.pattern_handler import _AbstractMatrixParser
 
+
+MASK_VERSION = 3
 
 CALIBRATIONPAGE_SIZE = pagesizes.A4
 EDGE_COLOUR = MAGENTA
@@ -275,7 +278,8 @@ class AnonmaskCreator(object):
         print("TDM offset: %f, %f"%(xOffset,yOffset))
 
         return dict(proto=dots_proto, hps=hps, vps=vps, x_offset=xOffset,
-            y_offset=yOffset, format_ver=2)
+            y_offset=yOffset, pagesize=CALIBRATIONPAGE_SIZE, 
+            format_ver=MASK_VERSION)
         
 
 def calibrationScan2Anonmask(imbin, copy=False):
@@ -293,25 +297,27 @@ class AnonmaskApplier(object):
     def __init__(self, mask, dotRadius=None, xoffset=None, 
                 yoffset=None, black=False):
         d = json.loads(mask)
-        if d.get("format_ver",0) < 2:
-            raise Exception(("Incompatible format version by mask '%s'. "
+        if d.get("format_ver",0) < MASK_VERSION:
+            raise Exception("Incompatible format version by mask. "
                 "Please generate AND print a new calibration page (see "
-                "deda_anonmask_create).")%self.args.mask)
+                "deda_anonmask_create).")
         proto = d["proto"]
         self.hps = d["hps"]
         self.vps = d["vps"]
-        xOffset = xoffset or d["x_offset"]
-        yOffset = yoffset or d["y_offset"]
-        self.proto = [(xDot+xOffset,yDot+yOffset) for xDot, yDot in proto]
+        self.xOffset = xoffset or d["x_offset"]
+        self.yOffset = yoffset or d["y_offset"]
+        self.proto = [(xDot+self.xOffset,yDot+self.yOffset) 
+            for xDot, yDot in proto]
+        self.pagesize = d["pagesize"]
         if dotRadius: self.dotRadius = dotRadius
-        self.xOffset = xOffset
-        self.yOffset = yOffset
         if black: self.colour = BLACK
+        self.maskpdf = self._createMask()
 
     def apply(self, inPdf):
-        return self.pdfWatermark(inPdf, self._createMask)
+        return self.pdfWatermark(inPdf, lambda w,h:self.maskpdf)
   
-    def _createMask(self, w, h):
+    def _createMask(self):
+        w,h = self.pagesize
         w = float(w)
         h = float(h)
         io = BytesIO()
@@ -350,20 +356,25 @@ class AnonmaskApplier(object):
         if not isinstance(pdfin, bytes):
             with open(pdfin,"rb") as fp: pdfin = fp.read()
         input_ = PdfFileReader(BytesIO(pdfin))
+        """
         pageBoxes = [input_.getPage(p_nr).mediaBox
             for p_nr in range(input_.getNumPages())
         ]
         maxWidth = max([b.getWidth() for b in pageBoxes])
         maxHeight = max([b.getHeight() for b in pageBoxes])
         maskPdf = maskCreator(maxWidth, maxHeight)
-
+        """
+        
         for p_nr in range(input_.getNumPages()):
             page = input_.getPage(p_nr)
             box = page.mediaBox
-            #maskPdf = maskCreator(box.getWidth(),box.getHeight() )
+            maskPdf = maskCreator(box.getWidth(),box.getHeight() )
             maskPage = PdfFileReader(maskPdf).getPage(0)
-            page.mergePage(maskPage)
-            output.addPage(page)
+            #page.mergePage(maskPage)
+            #output.addPage(page)
+            maskPage.mergePage(page)
+            maskPage.compressContentStreams()
+            output.addPage(maskPage)
         
         outIO = BytesIO()
         output.write(outIO)
