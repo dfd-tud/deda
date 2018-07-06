@@ -43,7 +43,7 @@ class Main(object):
                 mask = calibrationScan2Anonmask(fp.read(),self.args.copy)
             output = "mask.json"
             print("Writing mask data to '%s'."%output)
-            with open(output,"w") as fp:
+            with open(output,"wb") as fp:
                 fp.write(mask)
         
 

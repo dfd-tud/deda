@@ -20,7 +20,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import pagesizes
 from colorsys import rgb_to_hsv
 from libdeda.print_parser import PrintParser, patternDict
-from libdeda.extract_yd import rotateImage, matrix2str
+from libdeda.extract_yd import rotateImage, matrix2str, ImgProcessingMixin
 from libdeda.cmyk_to_rgb import CYAN, MAGENTA, BLACK, YELLOW
 from libdeda.pattern_handler import _AbstractMatrixParser
 
@@ -91,13 +91,13 @@ class AnonmaskCreator(object):
             sys.stderr.write("Warning: Cannot determine dpi of input. "
                 +"Assuming %f dpi.\n"%self.dpi)
 
-    def __call__(self, copy=False):
+    def __call__(self, *args, **xargs):
         self.restoreOrientation()
         #cv2.imwrite("orientation.png",self.im)
         #cv2.imwrite("magenta.png",self._selectColour(MAGENTA))
         self.restorePerspective() #FIXME: rotation statt perspective?
-        maskdata = self.createMask(copy)
-        return json.dumps(maskdata)
+        maskdata = self.createMask(*args, **xargs)
+        return json.dumps(maskdata).encode("ascii")
         
     @property
     def centre(self):
@@ -278,8 +278,8 @@ class AnonmaskCreator(object):
             y_offset=yOffset, format_ver=2)
         
 
-def calibrationScan2Anonmask(imbin, *args, **xargs):
-    return AnonmaskCreator(imbin)(*args,**xargs)
+def calibrationScan2Anonmask(imbin, copy=False):
+    return AnonmaskCreator(imbin)(copy)
     
 
 class AnonmaskApplier(object):
@@ -370,4 +370,28 @@ class AnonmaskApplier(object):
         outIO.seek(0)
         return outIO.read()
 
-        
+
+class ScanCleaner(ImgProcessingMixin):
+    """ Remove Yellow Dots From White Areas of Scanned Pages """
+    
+    _verbosity = 0
+    
+    def __init__(self, imbin, *args, **xargs):
+        file_bytes = np.asarray(bytearray(imbin), dtype=np.uint8)
+        self.im = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        super(ScanCleaner, self).__init__(BytesIO(imbin), *args, **xargs)
+    
+    def __call__(self, grayscale=False, outformat=".png"):
+        _, mask = self.processImage(self.im,workAtDpi=None,halftonesBlur=10,
+            ydColourRange=((16,1,214),(42,120,255)),
+            paperColourThreshold=225)#233
+        self.im[mask==255] = 255
+        if grayscale: self.im = cv2.cvtColor(self.im, cv2.COLOR_BGR2GRAY)
+        #cv2.imwrite(output,self.im)
+        return cv2.imencode(outformat, self.im)[1]
+
+
+def cleanScan(imbin,*args,**xargs):
+    return ScanCleaner(imbin)(*args,**xargs)
+    
+    
