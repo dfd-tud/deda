@@ -12,7 +12,7 @@ the Free Software Foundation, either version 3 of the License, or
 '''
 
 import sys, argparse
-from libdeda.privacy import DOTRADIUS, AnonmaskApplier
+from libdeda.privacy import AnonmaskApplier
 
 
 class Main(object):
@@ -22,11 +22,11 @@ class Main(object):
             description='Apply an anonymisation mask to a page')
         parser.add_argument("--xoffset", type=float, metavar="INCHES", default=None, help='Manual horizontal TDM offset')
         parser.add_argument("--yoffset", type=float, metavar="INCHES", default=None, help='Manual vertical TDM offset')
-        parser.add_argument("--dotradius", type=float, metavar="INCHES", default=DOTRADIUS, help='Dot radius, default=%f'%DOTRADIUS)
+        parser.add_argument("--dotradius", type=float, metavar="INCHES", default=None, help='Dot radius, default=%f'%AnonmaskApplier.dotRadius)
         parser.add_argument("--black", action="store_true", default=False, help='DEBUG: Print dots black instead of yellow')
 
-        parser.add_argument("mask", type=str, metavar="MASK", help='Path to mask by anonmask_create')
-        parser.add_argument("page", type=str, metavar="PAGE", help='Path to page that shall be printed')
+        parser.add_argument("mask", type=str, metavar="MASKFILE", help='Path to mask by anonmask_create')
+        parser.add_argument("page", type=str, metavar="PDF_DOCUMENT", help='Path to page that shall be printed')
         parser.add_argument("-v",'--verbose', action='count', default=0, help='Fehlerausgabe')
         self.args = parser.parse_args()
 

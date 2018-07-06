@@ -18,14 +18,17 @@ from reportlab.pdfgen import canvas
 from libdeda.cmyk_to_rgb import BLACK, YELLOW, CYAN
 
 
-DOTRADIUS = 0.004 #in
 
 
 class AnonmaskApplier(object):
-
+    """
+    Apply the anonymisation mask created by AnonmaskCreator to a page for 
+    printing
+    """
     colour = YELLOW
+    dotRadius = 0.004 #in
 
-    def __init__(self, mask, dotRadius=DOTRADIUS, xoffset=None, 
+    def __init__(self, mask, dotRadius=None, xoffset=None, 
                 yoffset=None, black=False):
         d = json.loads(mask)
         if d.get("format_ver",0) < 2:
@@ -38,7 +41,7 @@ class AnonmaskApplier(object):
         xOffset = xoffset or d["x_offset"]
         yOffset = yoffset or d["y_offset"]
         self.proto = [(xDot+xOffset,yDot+yOffset) for xDot, yDot in proto]
-        self.dotRadius = dotRadius
+        if dotRadius: self.dotRadius = dotRadius
         self.xOffset = xOffset
         self.yOffset = yOffset
         if black: self.colour = BLACK
