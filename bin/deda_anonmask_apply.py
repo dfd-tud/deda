@@ -23,7 +23,7 @@ class Main(object):
         parser.add_argument("--xoffset", type=float, metavar="INCHES", default=None, help='Manual horizontal TDM offset')
         parser.add_argument("--yoffset", type=float, metavar="INCHES", default=None, help='Manual vertical TDM offset')
         parser.add_argument("--dotradius", type=float, metavar="INCHES", default=None, help='Dot radius, default=%f'%AnonmaskApplier.dotRadius)
-        parser.add_argument("--black", action="store_true", default=False, help='DEBUG: Print dots black instead of yellow')
+        parser.add_argument("--debug", action="store_true", default=False, help='DEBUG: Print magenta dots instead of yellow ones')
 
         parser.add_argument("mask", type=str, metavar="MASKFILE", help='Path to mask by anonmask_create')
         parser.add_argument("page", type=str, metavar="PDF_DOCUMENT", help='Path to page that shall be printed')
@@ -36,7 +36,7 @@ class Main(object):
     def __call__(self):
         with open(self.args.mask) as fp:
             aa = AnonmaskApplier(fp.read(), self.args.dotradius, 
-                self.args.xoffset, self.args.yoffset, self.args.black)
+                self.args.xoffset, self.args.yoffset, self.args.debug)
         OUTFILE = "masked.pdf"
 
         print("Parameters:")

@@ -295,7 +295,7 @@ class AnonmaskApplier(object):
     dotRadius = 0.004 #in
 
     def __init__(self, mask, dotRadius=None, xoffset=None, 
-                yoffset=None, black=False):
+                yoffset=None, debug=False):
         d = json.loads(mask)
         if d.get("format_ver",0) < MASK_VERSION:
             raise Exception("Incompatible format version by mask. "
@@ -310,7 +310,7 @@ class AnonmaskApplier(object):
             for xDot, yDot in proto]
         self.pagesize = d["pagesize"]
         if dotRadius: self.dotRadius = dotRadius
-        if black: self.colour = BLACK
+        if debug: self.colour = MAGENTA
         self.maskpdf = self._createMask()
 
     def apply(self, inPdf):
