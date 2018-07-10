@@ -198,7 +198,8 @@ class AnonmaskCreator(object):
         print("Extracting tracking dots... ")
         #cv2.imwrite("perspective.png",self.im)
         # get tracking dot matrices
-        pp = PrintParser(self.im,ydxArgs=dict(inputDpi=self.dpi))
+        pp = PrintParser(self.im,ydxArgs=dict(
+            inputDpi=self.dpi,interpolation=cv2.INTER_NEAREST))
         tdms = list(pp.getAllValidTdms())
         print("\t%d valid matrices"%len(tdms))
         

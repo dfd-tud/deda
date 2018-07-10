@@ -208,14 +208,14 @@ class ImgProcessingMixin(RotationMixin,CommonImageFunctions,Common):
 
     def processImage(self,im,halftonesBlur=HALFTONES_BLUR,
                 paperColourThreshold=COLOUR_THRESHOLD,workAtDpi=WORK_AT_DPI,
-                ydColourRange=YELLOW
+                ydColourRange=YELLOW, interpolation=cv2.INTER_CUBIC
             ):
             #CommonImageFunctions.__init__(self,*args,**xargs)
             self._print(2,"Image processing... ")
             self._print(2,"Input image dimensions: %d x %d\n"
                 %tuple(reversed(im.shape[:2])))
             if workAtDpi and workAtDpi < self.imgDpi:
-                im = self._resize(im,workAtDpi)
+                im = self._resize(im,workAtDpi,interpolation)
             makeBlur = lambda v: self.imgDpi/300.0*v
             mask = self._makeMask(
                 im,makeBlur(halftonesBlur),paperColourThreshold)
@@ -284,7 +284,7 @@ class ImgProcessingMixin(RotationMixin,CommonImageFunctions,Common):
         self._print(2,"at square %dx%d of %dx%d.\n"%(squareX+1,squareY+1,squaresX,squaresY))
         return int(cropX), int(cropX+sqW), int(cropY), int(cropY+sqW)
         
-    def _resize(self,im,dpi):
+    def _resize(self,im,dpi,interpolation):
         """ Resizes an image to @dpi dpi and return new cv2 image. """
         if dpi == self.imgDpi: return im
         factor = 1.0*dpi/self.imgDpi
@@ -293,7 +293,7 @@ class ImgProcessingMixin(RotationMixin,CommonImageFunctions,Common):
         self._print(2,("Resizing image from %d dpi to %d dpi, factor %f."
             +" Dimensions: %d x %d\n")%((self.imgDpi,newDpi,factor)+newSize))
         self.imgDpi = newDpi
-        im = cv2.resize(im,newSize,interpolation=cv2.INTER_CUBIC)
+        im = cv2.resize(im,newSize,interpolation=interpolation)
         self._imwrite("resize",im)
         return im
     
