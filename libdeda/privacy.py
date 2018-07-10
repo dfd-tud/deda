@@ -33,6 +33,10 @@ EDGE_COLOUR = MAGENTA
 EDGE_MARGIN = 2.0/6 # inches
 MARKER_SIZE = 5.0/72
     
+CALIBRATION_MARKERS = [(x,y)
+    for x in [0+EDGE_MARGIN, CALIBRATIONPAGE_SIZE[0]/72-EDGE_MARGIN]
+    for y in [0+EDGE_MARGIN, CALIBRATIONPAGE_SIZE[1]/72-EDGE_MARGIN]]
+
     
 def createCalibrationpage():
     """
@@ -48,14 +52,10 @@ def createCalibrationpage():
     im[:] = 255
     
     c.setFillColorRGB(*EDGE_COLOUR)
-    for x in [0+EDGE_MARGIN*72, CALIBRATIONPAGE_SIZE[0]-EDGE_MARGIN*72]:
-        for y in [0+EDGE_MARGIN*72, CALIBRATIONPAGE_SIZE[1]-EDGE_MARGIN*72]:
-            c.rect(x,y,MARKER_SIZE*72,MARKER_SIZE*72,
-                stroke=0, fill=1)
-    for x in [0+EDGE_MARGIN*imdpi, (CALIBRATIONPAGE_SIZE[0]/72-EDGE_MARGIN)*imdpi]:
-        for y in [0+EDGE_MARGIN*imdpi, (CALIBRATIONPAGE_SIZE[1]/72-EDGE_MARGIN)*imdpi]:
-            im[int(y-MARKER_SIZE*imdpi)+1:int(y)+1,
-                int(x):int(x+MARKER_SIZE*imdpi)] = tuple(reversed(EDGE_COLOUR))
+    for x,y in CALIBRATION_MARKERS:
+        c.rect(x*72,y*72,MARKER_SIZE*72,MARKER_SIZE*72, stroke=0, fill=1)
+        im[int((y-MARKER_SIZE)*imdpi)+1:int(y*imdpi)+1,
+            int(x*imdpi):int((x+MARKER_SIZE)*imdpi)] = tuple(reversed(EDGE_COLOUR))
     
     c.setFillColorRGB(*CYAN)
     c.rect(
@@ -98,13 +98,17 @@ class AnonmaskCreator(object):
         self.restoreOrientation()
         #cv2.imwrite("orientation.png",self.im)
         #cv2.imwrite("magenta.png",self._selectColour(MAGENTA))
+        self.restoreSkew()
+        self._magentaMarkers = self._getMagentaMarkers()
+        self.getPageScaling()
+        #cv2.imwrite("perspective.png",self.im)
         self.restorePerspective() #FIXME: rotation statt perspective?
         maskdata = self.createMask(*args, **xargs)
         return json.dumps(maskdata).encode("ascii")
         
     @property
     def centre(self):
-        return (self.im.shape[0]/2, self.im.shape[1]/2)
+        return (self.im.shape[1]/2, self.im.shape[0]/2)
             
     def _selectColour(self,colour):
         edgeHue = int(rgb_to_hsv(*colour)[0]*180)
@@ -156,13 +160,30 @@ class AnonmaskCreator(object):
         inputPoints = np.array(edges,dtype=np.float32)
         return inputPoints
         
-    def restorePerspective(self):
+    def restoreSkew(self):
         _,_, angle = cv2.minAreaRect(self._getMagentaMarkers())
         angle = angle%90 if angle%90<45 else angle%90-90
         print("Skew correction: rotating by %+f°"%angle)
         self.im = rotateImage(self.im, angle)
         
-        inputPoints = self._getMagentaMarkers()
+    def getPageScaling(self):
+        dist = lambda p1,p2:(abs(p1[0]-p2[0])**2+abs(p1[1]-p2[1])**2)**.5
+        scannedMarkers = [(x/self.dpi,y/self.dpi) 
+            for (x,y) in self._magentaMarkers.tolist()]
+        
+        distsScan = [dist(scannedMarkers[i],scannedMarkers[j])
+            for i in range(len(scannedMarkers)) 
+            for j in range(len(scannedMarkers)) if i>j]
+        distsReal = [dist(CALIBRATION_MARKERS[i],CALIBRATION_MARKERS[j])
+            for i in range(len(CALIBRATION_MARKERS)) 
+            for j in range(len(CALIBRATION_MARKERS)) if i>j]
+        dists = [a/b for a,b in zip(distsReal,distsScan)]
+        self.scaling = np.median(dists)
+        print("Scaling factor: %f theoretical inches = 1 inch on paper"
+            %self.scaling)
+            
+    def restorePerspective(self):
+        inputPoints = self._magentaMarkers
         outputPoints = np.array([(x*self.dpi, y*self.dpi) for x,y in [
             (0+EDGE_MARGIN, 0+EDGE_MARGIN),
             (0+EDGE_MARGIN, CALIBRATIONPAGE_SIZE[1]/72-EDGE_MARGIN),
@@ -280,7 +301,7 @@ class AnonmaskCreator(object):
 
         return dict(proto=dots_proto, hps=hps, vps=vps, x_offset=xOffset,
             y_offset=yOffset, pagesize=CALIBRATIONPAGE_SIZE, 
-            format_ver=MASK_VERSION)
+            scale=self.scaling, format_ver=MASK_VERSION)
         
 
 def calibrationScan2Anonmask(imbin, copy=False):
@@ -303,11 +324,12 @@ class AnonmaskApplier(object):
                 "Please generate AND print a new calibration page (see "
                 "deda_anonmask_create).")
         proto = d["proto"]
-        self.hps = d["hps"]
-        self.vps = d["vps"]
+        self.scale = d.get("scale",1)
+        self.hps = d["hps"]*self.scale
+        self.vps = d["vps"]*self.scale
         self.xOffset = xoffset or d["x_offset"]
         self.yOffset = yoffset or d["y_offset"]
-        self.proto = [(xDot+self.xOffset,yDot+self.yOffset) 
+        self.proto = [((xDot%d["hps"]+self.xOffset)*self.scale%self.hps,(yDot%d["vps"]+self.yOffset)*self.scale%self.vps)
             for xDot, yDot in proto]
         self.pagesize = d["pagesize"]
         if dotRadius: self.dotRadius = dotRadius
@@ -328,8 +350,8 @@ class AnonmaskApplier(object):
         for x_ in range(int(w/self.hps/72+1)):
             for y_ in range(int(h/self.vps/72+1)):
                 for xDot, yDot in self.proto:
-                    x = (x_*self.hps+xDot%self.hps)*72
-                    y = h - (y_*self.vps+yDot%self.vps)*72
+                    x = (x_*self.hps+xDot)*72
+                    y = h - (y_*self.vps+yDot)*72
                     if x > w or y > h: continue
                     c.circle(x,y,self.dotRadius*72,stroke=0,fill=1)
         c.showPage()
