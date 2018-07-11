@@ -74,7 +74,9 @@ class PageObject(pdf.PageObject):
                 code_s += data + b"\n"
 
 
-        originalContent = self["/Contents"].getObject()
+        originalContent = self.get("/Contents",
+            ContentStream(ArrayObject(), self.pdf)
+        ).getObject()
         outputContent = PageObject._addCode(originalContent, self.pdf, code_s)
 
         self[NameObject('/Contents')] = outputContent
