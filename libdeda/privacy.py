@@ -13,6 +13,7 @@ the Free Software Foundation, either version 3 of the License, or
 import sys, json, cv2
 import numpy as np
 from io import BytesIO
+from itertools import combinations
 try: import Image
 except ImportError: from PIL import Image
 import libdeda.pypdf2patch
@@ -170,15 +171,11 @@ class AnonmaskCreator(object):
         dist = lambda p1,p2:(abs(p1[0]-p2[0])**2+abs(p1[1]-p2[1])**2)**.5
         scannedMarkers = [(x/self.dpi,y/self.dpi) 
             for (x,y) in self._magentaMarkers.tolist()]
-        
-        distsScan = [dist(scannedMarkers[i],scannedMarkers[j])
-            for i in range(len(scannedMarkers)) 
-            for j in range(len(scannedMarkers)) if i>j]
-        distsReal = [dist(CALIBRATION_MARKERS[i],CALIBRATION_MARKERS[j])
-            for i in range(len(CALIBRATION_MARKERS)) 
-            for j in range(len(CALIBRATION_MARKERS)) if i>j]
+        distsScan = [dist(a,b) for a,b in combinations(scannedMarkers,2)]
+        distsReal = [dist(a,b) for a,b in combinations(CALIBRATION_MARKERS,2)
+            ]
         dists = [a/b for a,b in zip(distsReal,distsScan)]
-        self.scaling = np.median(dists)
+        self.scaling = np.average(dists)
         print("Scaling factor: %f theoretical inches = 1 inch on paper"
             %self.scaling)
             
