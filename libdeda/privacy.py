@@ -12,16 +12,20 @@ the Free Software Foundation, either version 3 of the License, or
 
 import sys, json, cv2
 import numpy as np
+from scipy.stats import circmean
 from io import BytesIO
 from itertools import combinations
 try: import Image
 except ImportError: from PIL import Image
+try: import wand
+except ImportError: pass
 import libdeda.pypdf2patch
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib import pagesizes
 from colorsys import rgb_to_hsv
-from libdeda.print_parser import PrintParser, patternDict
+from libdeda.print_parser import PrintParser, patternDict, prototypeHps, \
+    prototypeVps
 from libdeda.extract_yd import rotateImage, matrix2str, ImgProcessingMixin
 from libdeda.cmyk_to_rgb import CYAN, MAGENTA, BLACK, YELLOW
 from libdeda.pattern_handler import _AbstractMatrixParser
@@ -102,7 +106,8 @@ class AnonmaskCreator(object):
         self.restoreSkew()
         self._magentaMarkers = self._getMagentaMarkers()
         self.getPageScaling()
-        #cv2.imwrite("perspective.png",self.im)
+        self.dpi *= self.scaling
+        cv2.imwrite("perspective.png",self.im)
         self.restorePerspective() #FIXME: rotation statt perspective?
         maskdata = self.createMask(*args, **xargs)
         return json.dumps(maskdata).encode("ascii")
@@ -176,31 +181,14 @@ class AnonmaskCreator(object):
             ]
         dists = [a/b for a,b in zip(distsReal,distsScan)]
         self.scaling = np.average(dists)
+        #self.scaling = 1.041
         print("Scaling factor: %f theoretical inches = 1 inch on paper"
             %self.scaling)
             
     def restorePerspective(self):
         inputPoints = self._magentaMarkers
-        outputPoints = np.array([(x*self.dpi, y*self.dpi) for x,y in [
-            (0+EDGE_MARGIN, 0+EDGE_MARGIN),
-            (0+EDGE_MARGIN, CALIBRATIONPAGE_SIZE[1]/72-EDGE_MARGIN),
-            (CALIBRATIONPAGE_SIZE[0]/72-EDGE_MARGIN, 0+EDGE_MARGIN),
-            (CALIBRATIONPAGE_SIZE[0]/72-EDGE_MARGIN, CALIBRATIONPAGE_SIZE[1]/72-EDGE_MARGIN),
-        ]],dtype=np.float32)
-        """
-        inputPoints = np.array([
-            (np.min(cEdges[:,0]),np.min(cEdges[:,1])),
-            (np.min(cEdges[:,0]),np.max(cEdges[:,1])),
-            (np.max(cEdges[:,0]),np.min(cEdges[:,1])),
-            (np.max(cEdges[:,0]),np.max(cEdges[:,1])),
-        ], dtype=np.float32)
-        outputPoints = np.array([(x*self.dpi, y*self.dpi) for x,y in [
-            (0+EDGE_MARGIN, 0+EDGE_MARGIN-MARKER_SIZE),
-            (0+EDGE_MARGIN, CALIBRATIONPAGE_SIZE[1]/72-EDGE_MARGIN),
-            (CALIBRATIONPAGE_SIZE[0]/72-EDGE_MARGIN+MARKER_SIZE, 0+EDGE_MARGIN-MARKER_SIZE),
-            (CALIBRATIONPAGE_SIZE[0]/72-EDGE_MARGIN+MARKER_SIZE, CALIBRATIONPAGE_SIZE[1]/72-EDGE_MARGIN),
-        ]],dtype=np.float32)
-        """
+        outputPoints = np.array([(x*self.dpi, y*self.dpi) 
+            for x,y in CALIBRATION_MARKERS],dtype=np.float32)
         l = cv2.getPerspectiveTransform(inputPoints,outputPoints)
         print("Perspective Transform")
         for (x1,y1),(x2,y2) in zip(inputPoints,outputPoints):
@@ -222,6 +210,8 @@ class AnonmaskCreator(object):
         print("\t%d valid matrices"%len(tdms))
         
         # select tdm
+        # tdms := [closest TDM at edge \forall edge \in Edges]
+        # |tdms| = |Edges|
         #pp.tdm = random.choice(tdms)
         width = pp.yd.im.shape[1]*pp.yd.imgDpi
         height = pp.yd.im.shape[0]*pp.yd.imgDpi
@@ -231,9 +221,12 @@ class AnonmaskCreator(object):
                 [abs(e1-tdm.atX)+abs(e2-tdm.atY) for tdm in tdms]
             )] for e1, e2 in edges]
         
+        #print("TDMs: %s"%", ".join([tdm.decode().get("serial","") for tdm in tdms]))
         print("\tTracking dots pattern found:")
         print("\tx=%d, y=%d, trans=%s"%(pp.tdm.atX,pp.tdm.atY,pp.tdm.trans))
         ni,nj,di,dj = patternDict[pp.pattern]
+        di = self.scaling*di
+        dj = self.scaling*dj
         hps = ni*di
         vps = nj*dj
         #tdm = pp.tdm
@@ -263,37 +256,23 @@ class AnonmaskCreator(object):
             if m[x,y] == 1]
         
         # set correct hps,vps for offset patterns
-        hps2 = hps/2 if pp.pattern in (1,5,6) else hps
-        vps2 = vps/2 if pp.pattern in (1,5,6) else vps
+        hps2 = hps*prototypeHps[pp.pattern]
+        vps2 = vps*prototypeVps[pp.pattern]
         
         # Calc xOffset and yOffset: Distance from (0,0) to the first marking
         # dots
         #xOffset = (pp.tdm.atX/pp.yd.imgDpi-pp.tdm.trans["x"]*di)%hps2
         #yOffset = (pp.tdm.atY/pp.yd.imgDpi-pp.tdm.trans["y"]*dj)%vps2
         
-        func = np.median #np.median #np.average
-        xOffsets = [(tdm.atX/pp.yd.imgDpi-tdm.trans["x"]*di)%hps2
+        xOffsets = [(tdm.atX*self.scaling/pp.yd.imgDpi-tdm.trans["x"]*di)%hps2
             for tdm in tdms]
-        xOffsets = [e if e>hps2/2 else e+hps2 for e in xOffsets]
-        xOffset = func(xOffsets)%hps2
-        yOffsets = [(tdm.atY/pp.yd.imgDpi-tdm.trans["y"]*dj)%vps2
+        xOffset = circmean(xOffsets, high=hps2)
+        yOffsets = [(tdm.atY*self.scaling/pp.yd.imgDpi-tdm.trans["y"]*dj)%vps2
             for tdm in tdms]
-        yOffsets = [e if e>vps2/2 else e+vps2 for e in yOffsets]
-        yOffset = func(yOffsets)%vps2
+        yOffset = circmean(yOffsets, high=vps2)
         
         if pp.tdm.trans["rot"]%2 == 1:
             xOffset, yOffset = yOffset, xOffset
-        
-        #print(hps,vps)
-        #print((np.array(xOffsets)%hps2).tolist(), 
-        #    (np.array(yOffsets)%vps2).tolist())
-        #xOffset = (pp.tdm.atX/pp.yd.imgDpi-pp.tdm.trans["x"]*di)%hps
-        #yOffset = (pp.tdm.atY/pp.yd.imgDpi-pp.tdm.trans["y"]*dj)%vps
-        
-        #print(xOffset,yOffset)
-        #xOffset, yOffset = 0.619892%hps, 0.5479907%vps #ricoh
-        #xOffset, yOffset = 0.3, 0.233333 #ricoh
-        #xOffset, yOffset = 0.408218954%hps, 0.695310458%vps # best for 2.png
         print("TDM offset: %f, %f"%(xOffset,yOffset))
 
         return dict(proto=dots_proto, hps=hps, vps=vps, x_offset=xOffset,
@@ -321,12 +300,12 @@ class AnonmaskApplier(object):
                 "Please generate AND print a new calibration page (see "
                 "deda_anonmask_create).")
         proto = d["proto"]
-        self.scale = d.get("scale",1)
-        self.hps = d["hps"]*self.scale
-        self.vps = d["vps"]*self.scale
+        scale = d.get("scale",1)
+        self.hps = d["hps"]
+        self.vps = d["vps"]
         self.xOffset = xoffset or d["x_offset"]
         self.yOffset = yoffset or d["y_offset"]
-        self.proto = [((xDot%d["hps"]+self.xOffset)*self.scale%self.hps,(yDot%d["vps"]+self.yOffset)*self.scale%self.vps)
+        self.proto = [((xDot%d["hps"]+self.xOffset*scale)%self.hps,(yDot%d["vps"]+self.yOffset*scale)%self.vps)
             for xDot, yDot in proto]
         self.pagesize = d["pagesize"]
         if dotRadius: self.dotRadius = dotRadius
@@ -334,9 +313,12 @@ class AnonmaskApplier(object):
         self.maskpdf = self._createMask()
 
     def apply(self, inPdf):
-        return self.pdfWatermark(inPdf, lambda w,h:self.maskpdf)
+        if "wand" in globals():
+            return self.pdfWatermark(inPdf, self._createMask, maskOnTop=True)
+        else: 
+            return self.pdfWatermark(inPdf, lambda *args:self.maskpdf, False)
   
-    def _createMask(self):
+    def _createMask(self,w=None,h=None,page=None):
         w,h = self.pagesize
         w = float(w)
         h = float(h)
@@ -344,21 +326,40 @@ class AnonmaskApplier(object):
         c = canvas.Canvas(io, pagesize=(w,h) )
         c.setStrokeColorRGB(*self.colour)
         c.setFillColorRGB(*self.colour)
+        allDots = []
         for x_ in range(int(w/self.hps/72+1)):
             for y_ in range(int(h/self.vps/72+1)):
                 for xDot, yDot in self.proto:
-                    x = (x_*self.hps+xDot)*72
-                    y = h - (y_*self.vps+yDot)*72
-                    if x > w or y > h: continue
-                    c.circle(x,y,self.dotRadius*72,stroke=0,fill=1)
+                    x = (x_*self.hps+xDot)
+                    y = (y_*self.vps+yDot)
+                    if x*72 > w or y*72 > h: continue
+                    allDots.append((x,y))
+
+        if "wand" in globals():
+            # PyPDF2 page to cv2 image
+            pageio = BytesIO()
+            pageWriter = PdfFileWriter()
+            pageWriter.addPage(page)
+            pageWriter.write(pageio)
+            pageio.seek(0)
+            with wand.image.Image(file=pageio,format="pdf",resolution=600) as wim:
+                imbin = wim.make_blob("png")
+            file_bytes = np.asarray(bytearray(imbin), dtype=np.uint8)
+            im = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            
+            # remove dots on black spots
+            allDots = [(x,y) for x,y in allDots if im[int(y*600),int(x*600)] != (0,0,0)]
+            
+        for x,y in allDots:
+            c.circle(x*72,h-y*72,self.dotRadius*72,stroke=0,fill=1)
         c.showPage()
         c.save()
         return io
-
+    
     @staticmethod
-    def pdfWatermark(pdfin, maskCreator):
+    def pdfWatermark(pdfin, maskCreator, maskOnTop=False):
         """
-        For each page from infile, maskCreator will be called with its dimensions
+        For each page from pdfin, maskCreator will be called with its dimensions
         and shall return a single page PDF to be put on top. The result is
         written to outfile.
         @pdfin PDF binary or file path
@@ -376,25 +377,21 @@ class AnonmaskApplier(object):
         if not isinstance(pdfin, bytes):
             with open(pdfin,"rb") as fp: pdfin = fp.read()
         input_ = PdfFileReader(BytesIO(pdfin))
-        """
-        pageBoxes = [input_.getPage(p_nr).mediaBox
-            for p_nr in range(input_.getNumPages())
-        ]
-        maxWidth = max([b.getWidth() for b in pageBoxes])
-        maxHeight = max([b.getHeight() for b in pageBoxes])
-        maskPdf = maskCreator(maxWidth, maxHeight)
-        """
         
         for p_nr in range(input_.getNumPages()):
             page = input_.getPage(p_nr)
             box = page.mediaBox
-            maskPdf = maskCreator(box.getWidth(),box.getHeight() )
+            maskPdf = maskCreator(box.getWidth(),box.getHeight(),page)
             maskPage = PdfFileReader(maskPdf).getPage(0)
-            #page.mergePage(maskPage)
-            #output.addPage(page)
-            maskPage.mergePage(page)
-            maskPage.compressContentStreams()
-            output.addPage(maskPage)
+            outPage = output.addBlankPage(maskPage.mediaBox.getWidth(),
+                maskPage.mediaBox.getHeight())
+            if maskOnTop:
+                outPage.mergePage(page)
+                outPage.mergePage(maskPage)
+            else:
+                outPage.mergePage(maskPage)
+                outPage.mergePage(page)
+            outPage.compressContentStreams()
         
         outIO = BytesIO()
         output.write(outIO)
