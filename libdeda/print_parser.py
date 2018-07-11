@@ -46,6 +46,8 @@ knownPatterns = [
 
 patternDict = {e[0]:e[1:5] for e in knownPatterns}
 patternLimits = {e[0]:e[-1] for e in knownPatterns}
+prototypeHps = {1:.5, 2:1, 3:1, 4:None, 5:.5, 6:.5, 41:None}
+prototypeVps = {1:.5, 2:1, 3:1, 4:None, 5:.5, 6:.5, 41:None}
 
 
 class YD_Parsing_Error(Exception): 
