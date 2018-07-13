@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="stephan escher">
+
+    <title>Deda Toolkit</title>
+
+    <!-- CSS Import-->
+    <link href="../css/bootstrap.min.css" rel="stylesheet">
+    <link href="../css/dedastyle.css" rel="stylesheet">
+    <link href="../css/fontawesome-all.css" rel="stylesheet">
+    <!-- EEL -->
+    <script type='text/javascript' src='/eel.js'></script>
+
+</head>
+
+<body>
+    <div id="wrapper" class="toggled">
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper"></div>
+
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <div class="container-fluid">
+                <a href="#menu-toggle" id="menu-toggle"><i class="fas fa-ellipsis-h"></i></a><a class="language" href="../index.html"> English</a>
+                <hr><h1>Deda Toolkit</h1><hr><br>
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Tracking Dot Extraktions-, Dekodierungs- and Anonymisierungs-Toolkit</h5>
+                        <img class="logo" src="../misc/logo.png"></img>
+                        <p>Dieses Toolkit ermöglicht die Extraktion und Dekodierung von gescannten Ausdrucken hinsichtlich möglicher
+                            eingebetteter Tracking-Punkte. Darüber hinaus ermöglicht es die Anonymisierung von digitalisierten Ausdrucken
+                            sowie die Erstellung eines Anonymisierungsmusters für den Druck. Außerdem können Sie verschiedene Ausdrucke
+                            hinsichtlich ihrer eingebetteten Tracking-Punkte vergleichen.<br>
+                            Das Tool ist derzeit noch in der Beta-Phase.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Ext-->
+    <script src="../js/jquery.min.js"></script>
+    <script src="../js/bootstrap.bundle.min.js"></script>
+
+    <!-- Sidebar -->
+    <script type="text/javascript">
+        $("#menu-toggle").click(function(e) {
+            e.preventDefault();
+            $("#wrapper").toggleClass("toggled");
+        });
+
+        $(document).ready(function(){
+            $('#sidebar-wrapper').load('sidebar.html');
+        });
+    </script>
+</body>
+
+</html>

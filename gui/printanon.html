@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="stephan escher">
+
+    <title>Deda Toolkit</title>
+
+    <!-- CSS Import-->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/dedastyle.css" rel="stylesheet">
+    <link href="css/fontawesome-all.css" rel="stylesheet">
+    <!-- EEL -->
+    <script type='text/javascript' src='/eel.js'></script>
+
+</head>
+
+<body>
+    <div id="wrapper" class="toggled">
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper"></div>
+
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <div class="container-fluid">
+                <a href="#menu-toggle" id="menu-toggle"><i class="fas fa-ellipsis-h"></i></a><a class="language" href="de/printanon.html"> Deutsch </a>
+                <hr><h3> Generate Printer Mask <i class="fas fa-file"></i></h3><hr>
+                <br>
+                <div id="card1" class="card">
+                    <div class="card-body">
+                        This part enables the creation of an anonymization mask for anonymized printing regarding a specific printer.
+                    </div>
+                </div><br>
+                <div id="card1" class="card">
+                    <div class="card-body">
+                        <form>
+                          <b>1.</b> Print the calibration sheet on white paper with the printer to be anonymized (borderless)<br>
+                          <a href="misc/calibration.ps" class="btn btn-secondary" style="margin-left:10px;margin-top:10px;" download><i class="fas fa-print"></i> Download Calibration Sheet (.ps)</a>
+                          <!--a href="misc/calibration.png" class="btn btn-secondary" style="margin-top:10px;" download><i class="fas fa-print"></i> Download .png</a-->
+                        </form>
+                    </div>
+                </div><br>
+                <div id="card1" class="card">
+                    <div class="card-body">
+                        <form>
+                         <b>2.</b> Load printed and scanned (min 300dpi, color) calibration sheet and generate anonymization mask.
+                         <a tabindex="0" role="button" data-toggle="popover" data-trigger="focus" data-html="true" title="Copy file path"
+                         data-content="<u>Windows</u><ul><li>Shift+right click on file</li><li>copy path</li><li>Strg+v in text field</ul></li>
+                         <u>Linux</u><ul><li>Strg+c on file</li><li>Strg+v in text field</li></ul>"><i class="far fa-lightbulb"></i></i></a>
+                          <div class="form-group">
+                                <input id='file_selector' style="margin-top:10px;margin-bottom:10px;" class="col-md-12 form-control" placeholder='Type file path of printed calibration sheet.'></input>
+
+                                <div class="form-row">
+                                    <div class="col-md-10"><a href='javascript:void()' class="btn btn-secondary" onclick='generate_file()'><i class="fas fa-pencil-alt"></i> Generate</a></div>
+                                    <div class="col-md-2"><i class="fas fa-spinner fa-pulse" id="loading" style="visibility:hidden;margin-left:10px;"></i></div>
+                                </div>
+                          </div>
+                        </form>
+                    </div>
+                </div><br>
+                <div id="card1" class="card">
+                    <div class="card-body">
+                        <b>3.</b> Go to: <a href="printanon2.html"> <i class="fas fa-link"></i> Print Anonymization</a>
+                    </div>
+                </div>
+                <br>
+                <div class="alert alert-danger" id="file_info" role="alert" style="visibility:hidden;"></div>
+                <div class="alert alert-success" id="result" role="alert" style="visibility:hidden;"></div>
+                <br><br><br><br>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Ext-->
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+
+    <!-- Misc -->
+    <script type="text/javascript">
+        $("#menu-toggle").click(function(e) {
+            e.preventDefault();
+            $("#wrapper").toggleClass("toggled");
+        });
+        $(document).ready(function(){
+            $('#sidebar-wrapper').load('sidebar.html');
+        });
+        $('[data-toggle="popover"]').popover({
+            trigger: 'focus'
+        });
+    </script>
+
+    <!-- Forensic-->
+    <script type="text/javascript">
+
+        async function generate_file() {
+            document.getElementById('loading').style["visibility"] = '';
+            let calibrationfile = document.getElementById('file_selector').value;
+            let file_info = document.getElementById('file_info');
+            let result = document.getElementById('result');
+            file_info.innerHTML = '';
+            result.innerHTML = '';
+            file_info.style["visibility"] = "hidden";
+            result.style["visibility"] = "hidden";
+            // Send to Python
+            let info = await eel.generateMask(calibrationfile)();
+            done = info.split(".")[0];
+            if(done == 'Done'){
+                result.style["visibility"] = '';
+                result.innerHTML = info;
+            }
+            else if(info != ''){
+                file_info.style["visibility"] = '';
+                file_info.innerHTML = info;
+            }
+            document.getElementById('loading').style["visibility"] = 'hidden';
+        }
+    </script>
+
+</body>
+
+</html>

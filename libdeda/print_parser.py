@@ -90,6 +90,7 @@ class PrintParser(object):
             exceptions.append(e)
             self._print("%s\n"%repr(e))
         else:
+            self.tdm = self.validMatrices[0]
             self._print("\n")
             break
     if self.pattern is None: 
