@@ -117,22 +117,27 @@ class PrintParser(object):
   def _calcPattern(self):
     """ Returns the automatically detected pattern id """
     self._print("Getting candidates")
+
+    # make mmList: interpretation of a sheet under any pattern
     mmLists = {}
     for p,patternParams in patternDict.items():
         self._print(".")
-        mm = self.yd.getAllMatrices(*patternParams)#,cutLength=2.3)
-        mm = [(x,y,m) for x,y,m in mm if .5 not in m and 1 in m]
+        ni,nj,di,dj = patternParams
+        mm = self.yd.getAllMatrices(*patternParams)#,cutLength=(ni*di,nj*dj))
+        mm = [(meta,m) for meta,m in mm if .5 not in m and 1 in m]
         mmLists[p] = mm
     self._print(" %s"%", ".join(["p%d: %d"
         %(p,len(mm)) for p,mm in mmLists.items()]))
     self._print("\n")
+
     candidates = {} #patternId -> score
     validMatrices = {} #patternId -> mList
     i = 0
     while True:
         mm = {p:mm[i] for p,mm in mmLists.items() if len(mm)>i}
         if len(mm)==0: break
-        valid = [(p,tdm) for p,m in mm.items() for tdm in self._getTdms(p,*m)]
+        valid = [(p,tdm) for p,(meta,m) in mm.items() 
+            for tdm in self._getTdms(p,meta,m) if tdm.check() == True]
         for p,tdm in valid:
             validMatrices[p] = validMatrices.get(p,[])+[tdm]
             candidates[p] = candidates.get(p,0)+1
@@ -176,22 +181,36 @@ class PrintParser(object):
         dy = np.average((coords[1]-y)%dj)
         return dx, dy
 
-  def _getTdms(self, p,x,y,m):
+  def _getTdms(self, p,meta,m):
+        cropx, cropy, gridx, gridy, cellx, celly = meta
+        x = cropx+gridx+cellx
+        y = cropy+gridy+celly
         x_,y_=self._get_dxy(x,y,p)
         for t in patterns[p].getTransformations(m):
             tdm = TDM(pattern=p,m=m,trans=t,
                 atX=x+x_,atY=y+y_)
-            if tdm.check() != True: continue
+            tdm.meta_position = meta+(x_,y_)
             yield tdm
             #[tdm for t in patterns[p].getTransformations(m) 
             #for tdm in [TDM(pattern=p,m=m,trans=t,atX=x,atY=y)] 
             #if tdm.check() == True]
    
   def getAllValidTdms(self):
-    for m in self.allTDMs:
-        for tdm in self._getTdms(self.pattern,*m):
-            yield tdm
+    """ TDMs where redundance check passed """
+    for tdm in self.getAllTdms():
+        if tdm.check() == True: yield tdm
     
+  def getAllTdms(self):
+    """ TDMs where redundance check passed or failed """
+    for meta,m in self.allTDMs:
+        for tdm in self._getTdms(self.pattern,meta,m):
+            yield tdm
+  
+  def getAllCorrectTdms(self):
+    """ TDMs where redundance check passed and content is valid """
+    for tdm in self.getAllValidTdms():
+        if tdm.decode()["raw"] == self.tdm.decode()["raw"]: yield tdm
+  
   def getValidMatrixFromSheet(self):
     """
     Returns the valid TDM from list
