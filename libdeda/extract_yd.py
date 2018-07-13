@@ -129,7 +129,7 @@ class CommonImageFunctions(Common):
         if not isinstance(im,np.ndarray):
             with Image.open(im) as pilimg:
                 try:
-                    dpi = [n.numerator for n in pilimg.info["dpi"]]
+                    dpi = [float(n) for n in pilimg.info["dpi"]]
                 except KeyError: pass
                 else: return np.average(dpi)
                 shape = pilimg.size

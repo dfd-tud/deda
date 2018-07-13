@@ -91,7 +91,7 @@ class AnonmaskCreator(object):
         file_bytes = np.asarray(bytearray(imbin), dtype=np.uint8)
         self.im = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
         try:
-                dpi = [n.numerator for n in Image.open(BytesIO(imbin)).info["dpi"]]
+                dpi = [float(n) for n in Image.open(BytesIO(imbin)).info["dpi"]]
                 self.dpi = np.average(dpi)
                 if self.dpi == 72: raise ValueError("assuming invalid dpi")
         except (KeyError, ValueError):
