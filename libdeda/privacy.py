@@ -93,7 +93,7 @@ class AnonmaskCreator(object):
         try:
                 dpi = [float(n) for n in Image.open(BytesIO(imbin)).info["dpi"]]
                 self.dpi = np.average(dpi)
-                if self.dpi == 72: raise ValueError("assuming invalid dpi")
+                if self.dpi == 72: raise ValueError("assuming wrong dpi")
         except (KeyError, ValueError):
             self.dpi = round(max(self.im.shape)/(max(CALIBRATIONPAGE_SIZE)/72),-2)
             sys.stderr.write("Warning: Cannot determine dpi of input. "
@@ -107,7 +107,7 @@ class AnonmaskCreator(object):
         self._magentaMarkers = self._getMagentaMarkers()
         self.getPageScaling()
         self.dpi *= self.scaling
-        cv2.imwrite("perspective.png",self.im)
+        #cv2.imwrite("perspective.png",self.im)
         self.restorePerspective() #FIXME: rotation statt perspective?
         maskdata = self.createMask(*args, **xargs)
         return json.dumps(maskdata).encode("ascii")
@@ -170,7 +170,7 @@ class AnonmaskCreator(object):
         _,_, angle = cv2.minAreaRect(self._getMagentaMarkers())
         angle = angle%90 if angle%90<45 else angle%90-90
         print("Skew correction: rotating by %+f°"%angle)
-        self.im = rotateImage(self.im, angle)
+        self.im = rotateImage(self.im, angle, cv2.INTER_NEAREST)
         
     def getPageScaling(self):
         dist = lambda p1,p2:(abs(p1[0]-p2[0])**2+abs(p1[1]-p2[1])**2)**.5
@@ -180,7 +180,10 @@ class AnonmaskCreator(object):
         distsReal = [dist(a,b) for a,b in combinations(CALIBRATION_MARKERS,2)
             ]
         dists = [a/b for a,b in zip(distsReal,distsScan)]
-        self.scaling = np.average(dists)
+        self.scaling = np.max(dists)
+        if abs(1-self.scaling) > 0.01: sys.stderr.write(
+            "WARNING: Your print has probably been resized. For better "    
+            "results disable \"fit to page\".\n")
         #self.scaling = 1.041
         print("Scaling factor: %f theoretical inches = 1 inch on paper"
             %self.scaling)
@@ -195,7 +198,9 @@ class AnonmaskCreator(object):
             print("\tMapping %d,%d -> %d,%d"%(x1,y1,x2,y2))
         testpageSizePx = (
             int(CALIBRATIONPAGE_SIZE[0]/72*self.dpi), int(CALIBRATIONPAGE_SIZE[1]/72*self.dpi))
-        self.im = cv2.warpPerspective(self.im,l,testpageSizePx)
+        self.im = cv2.warpPerspective(self.im,l,testpageSizePx,
+            #flags=cv2.INTER_LINEAR+cv2.WARP_FILL_OUTLIERS)
+            flags=cv2.INTER_NEAREST+cv2.WARP_FILL_OUTLIERS)
         
     def createMask(self, copy):
         """
@@ -209,6 +214,7 @@ class AnonmaskCreator(object):
         tdms = list(pp.getAllValidTdms())
         print("\t%d valid matrices"%len(tdms))
         
+        """
         # select tdm
         # tdms := [closest TDM at edge \forall edge \in Edges]
         # |tdms| = |Edges|
@@ -220,6 +226,7 @@ class AnonmaskCreator(object):
             tdms[np.argmin(
                 [abs(e1-tdm.atX)+abs(e2-tdm.atY) for tdm in tdms]
             )] for e1, e2 in edges]
+        """
         
         #print("TDMs: %s"%", ".join([tdm.decode().get("serial","") for tdm in tdms]))
         print("\tTracking dots pattern found:")
@@ -264,10 +271,10 @@ class AnonmaskCreator(object):
         #xOffset = (pp.tdm.atX/pp.yd.imgDpi-pp.tdm.trans["x"]*di)%hps2
         #yOffset = (pp.tdm.atY/pp.yd.imgDpi-pp.tdm.trans["y"]*dj)%vps2
         
-        xOffsets = [(tdm.atX*self.scaling/pp.yd.imgDpi-tdm.trans["x"]*di)%hps2
+        xOffsets = [(tdm.atX/pp.yd.imgDpi-tdm.trans["x"]*di)%hps2
             for tdm in tdms]
         xOffset = circmean(xOffsets, high=hps2)
-        yOffsets = [(tdm.atY*self.scaling/pp.yd.imgDpi-tdm.trans["y"]*dj)%vps2
+        yOffsets = [(tdm.atY/pp.yd.imgDpi-tdm.trans["y"]*dj)%vps2
             for tdm in tdms]
         yOffset = circmean(yOffsets, high=vps2)
         
