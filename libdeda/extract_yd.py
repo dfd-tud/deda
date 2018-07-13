@@ -131,7 +131,9 @@ class CommonImageFunctions(Common):
                 try:
                     dpi = [float(n) for n in pilimg.info["dpi"]]
                 except KeyError: pass
-                else: return np.average(dpi)
+                else: 
+                    dpi = np.average(dpi)
+                    if dpi != 72: return dpi
                 shape = pilimg.size
         else: shape = im.shape
         # assume DIN A4
@@ -718,22 +720,24 @@ class YellowDotsXposerBasic(
         self.matrices = self._splitFullMatrix(self.fullMatrix, nx, ny)
         return self.matrices
 
-    def getAllFullMatrices(self,dx,dy,cutLength=ANALYSING_SQUARE_WIDTH):
+    def getAllFullMatrices(self,dx,dy,
+            cutLength=(ANALYSING_SQUARE_WIDTH,ANALYSING_SQUARE_WIDTH)):
         """ 
         Returns list fullMatrices for all possible crops. 
         See also doc for getAllMatrices() 
-        @returns: [(crop_x, crop_y, fullMatrix)]
+        @returns: [((crop_x, crop_y, grid_x, grix_y), fullMatrix)]
         """
-        w = float(cutLength*self.imgDpi)
+        w = float(cutLength[0]*self.imgDpi)
+        h = float(cutLength[1]*self.imgDpi)
         matrices = []
         im = self.im
         inked = self.inked
         dots = self.dots
         # TODO: if None in (dx,dy,nx,ny): once calc all for the first cut
         for x1 in ([int(x*w) for x in range(int(math.floor(im.shape[1]/w)))]+[max(0,int(im.shape[1]-w))]):
-            for y1 in ([int(y*w) for y in range(int(math.floor(im.shape[0]/w)))]+[max(0,int(im.shape[0]-w))]):
+            for y1 in ([int(y*h) for y in range(int(math.floor(im.shape[0]/h)))]+[max(0,int(im.shape[0]-h))]):
                 x2 = min(int(x1+w),im.shape[1])
-                y2 = min(int(y1+w),im.shape[0])
+                y2 = min(int(y1+h),im.shape[0])
                 self.im = im[y1:y2,x1:x2]
                 self.inked = inked[y1:y2,x1:x2]
                 # set self.dots, notice: self.getDots() is expensive
@@ -744,7 +748,7 @@ class YellowDotsXposerBasic(
                 #    if x>=x1 and x<x2 and y>=y1 and y<y2])
                 #self.cleanDotPositions(crop=False) #optional
                 deltax, deltay, fullMatrix = self.grid(dx,dy)
-                matrices.append((x1+deltax,y1+deltay,fullMatrix))
+                matrices.append(((x1,y1,deltax,deltay),fullMatrix))
         self.im = im
         self.inked = inked
         self.dots = dots
@@ -759,17 +763,17 @@ class YellowDotsXposerBasic(
         IMPORTANT: When calling this, cleanDotPositions must not have been
             called before with parameter crop=True (default).
 
-        @length Square side length in inches
-        @returns: matrix list
+        @cutLength tuple. Cut the page into rectangles of (x,y)
+        @returns: [((crop_x, crop_y, grid_x, grid_y, cell_x, cell_y), m)]
         """
         fullMatrices = self.getAllFullMatrices(dx,dy,**xargs)
         mList = [
-            (xCrop+xCell*dx*self.imgDpi,yCrop+yCell*dy*self.imgDpi,m)
-            for xCrop,yCrop,fullMatrix in fullMatrices
+            (meta+(xCell*dx*self.imgDpi,yCell*dy*self.imgDpi), m)
+            for meta,fullMatrix in fullMatrices
             for xCell,yCell,m in 
                 self._splitFullMatrix(fullMatrix,nx,ny,sort=False)]
-        _,idx = np.unique([m for x,y,m in mList],axis=0,return_index=True)
-        mList = np.array(mList,dtype=np.object)[idx].tolist()
+        #_,idx = np.unique([m for _,m in mList],axis=0,return_index=True)
+        #mList = np.array(mList,dtype=np.object)[idx].tolist()
         #dotCount = np.array([np.sum(m==1) for m in mList])
         #mList = list(reversed(mList[dotCount.argsort()]))
         sortfunc = lambda e: np.sum(e[-1])==1
@@ -859,12 +863,13 @@ def matrix2str(matrix):
 def array2str(a):
     return "".join([str(int(digit)) for digit in a.flatten()])        
 
-def rotateImage(image, angle):
+def rotateImage(image, angle, interpolation=cv2.INTER_LINEAR):
     """ source: https://stackoverflow.com/questions/9041681/opencv-python-rotate-image-by-x-degrees-around-specific-point """
     row,col = image.shape[:2]
     center=tuple(np.array([row,col])/2)
     rot_mat = cv2.getRotationMatrix2D(center,angle,1.0)
-    new_image = cv2.warpAffine(image, rot_mat, (col,row))
+    new_image = cv2.warpAffine(image, rot_mat, (col,row), 
+        flags=interpolation+cv2.WARP_FILL_OUTLIERS)
     return new_image
   
 
