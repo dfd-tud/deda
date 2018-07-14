@@ -867,7 +867,8 @@ def rotateImage(image, angle):
     new_image = cv2.warpAffine(image, rot_mat, (col,row))
     return new_image
   
+main = lambda: Main()()
 
 if __name__ == "__main__":
-    Main()()
+    main()
 
