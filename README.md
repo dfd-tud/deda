@@ -11,15 +11,17 @@ Timo Richter, Stephan Escher, Dagmar Schönfeld, and Thorsten Strufe. 2018. Fore
 
 #### 0. Install
 
-* From PyPI:
-`$ pip3 install deda`
-* From current directory:
-`$ pip3 install .`
+* Install Python 3
+* Install Deda
+From PyPI:
+`$ pip3 install --user deda`
+Or from current directory:
+`$ pip3 install --user .`
 
 
 #### 1. Reading tracking data   
 
-Tracking data can be read and sometimes be decoded from a scanned image. For good results the input shall use a lossless compression and 300 dpi.
+Tracking data can be read and sometimes be decoded from a scanned image. For good results the input shall use a lossless compression (e.g. png) and 300 dpi. Make sure to set a neutral contrast 
 `$ deda_parse_print INPUTFILE`
 
 
@@ -61,4 +63,23 @@ zero page margin setting.
 Check whether a masked page covers your printer's tracking dots by using a 
 microscope. The mask's dot radius, x and y offsets can be customised and 
 passed to `deda_anonmask_apply` as parameters.
+
+
+#### 6. Troubleshooting
+
+##### deda_parse_print: command not found
+
+Execute
+`$ export PATH="$PATH:$(python -c 'import site,os; print(os.path.join(site.USER_BASE, "bin"))')"`
+
+
+##### Deda does not recognise my tracking dots
+
+Set up your scan program so that it does not eliminate the paper structure nor tracking dots by some threshold and check again. Remember that monochrome pages as well as inkjet prints might not contain tracking dots.
+
+
+##### My printer does not print tracking dots. Can I hide this fact?
+
+If there are really no tracking dots, you can print the calibration page (`deda_anonmask_create -w`) with another printer and use the mask for your own one. You can use the anonymised version of the tracking dots or just copy them (`deda_anonmask_create --copy`). See chapter "Anonymise a document for printing".
+
 
