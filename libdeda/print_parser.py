@@ -22,7 +22,7 @@ import os, sys, random, math
 import numpy as np
 from libdeda.extract_yd import YDX, TooManyDotsException, matrix2str, \
     YELLOW_STRICT, YELLOW2, YELLOW_STRICTHUE, YELLOW_GREEDY, \
-    YELLOW_STRICTHUE_GREEDYSAT
+    YELLOW_STRICTHUE_GREEDYSAT, YELLOW_PURE
 from libdeda.pattern_handler import patterns, TDM
 
 
@@ -81,7 +81,7 @@ class PrintParser(object):
     exceptions = []
     
     #colourProfiles = [YELLOW_STRICTHUE,YELLOW_GREEDY,YELLOW_STRICT,YELLOW_STRICTHUE_GREEDYSAT]
-    colourProfiles = [YELLOW_GREEDY,YELLOW_STRICTHUE_GREEDYSAT,YELLOW_STRICTHUE]
+    colourProfiles = [YELLOW_GREEDY,YELLOW_STRICTHUE_GREEDYSAT,YELLOW_STRICTHUE,YELLOW_PURE]
     for i,cp in enumerate(colourProfiles):
         self.colourProfile = i
         self._print("Trying colour profile #%d... "%i)
@@ -101,12 +101,13 @@ class PrintParser(object):
     self._print("Extracting dots...\n")
     ydxArgs = self._ydxArgs.copy()
     ydxArgs.update(**xargs)
+    rotation = ydxArgs.pop("rotation",True)
     try:
         yd = YDX(**ydxArgs)
     except TooManyDotsException as e:
         raise YD_Parsing_Error("Too many dots found.",None)
     if not yd.hasDots: raise YD_Parsing_Error("No dots found.",yd)
-    yd.cleanDotPositions(crop=False)
+    yd.cleanDotPositions(crop=False,rotation=rotation)
     self.yd = yd
     
   def _print(self, s):
