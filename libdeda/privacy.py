@@ -103,12 +103,12 @@ class AnonmaskCreator(object):
         self.restoreOrientation()
         #cv2.imwrite("orientation.png",self.im)
         #cv2.imwrite("magenta.png",self._selectColour(MAGENTA))
-        self.restoreSkew()
+        #self.restoreSkew()
         self._magentaMarkers = self._getMagentaMarkers()
         self.getPageScaling()
-        self.dpi *= self.scaling
+        #self.dpi *= self.scaling
         #cv2.imwrite("perspective.png",self.im)
-        self.restorePerspective() #FIXME: rotation statt perspective?
+        #self.restorePerspective() #FIXME: rotation statt perspective?
         maskdata = self.createMask(*args, **xargs)
         return json.dumps(maskdata).encode("ascii")
         
@@ -214,7 +214,7 @@ class AnonmaskCreator(object):
         tdms = list(pp.getAllValidTdms())
         print("\t%d valid matrices"%len(tdms))
         
-        """
+        #"""
         # select tdm
         # tdms := [closest TDM at edge \forall edge \in Edges]
         # |tdms| = |Edges|
@@ -226,14 +226,14 @@ class AnonmaskCreator(object):
             tdms[np.argmin(
                 [abs(e1-tdm.atX)+abs(e2-tdm.atY) for tdm in tdms]
             )] for e1, e2 in edges]
-        """
+        #"""
         
         #print("TDMs: %s"%", ".join([tdm.decode().get("serial","") for tdm in tdms]))
         print("\tTracking dots pattern found:")
         print("\tx=%d, y=%d, trans=%s"%(pp.tdm.atX,pp.tdm.atY,pp.tdm.trans))
         ni,nj,di,dj = patternDict[pp.pattern]
-        di = self.scaling*di
-        dj = self.scaling*dj
+        #di = self.scaling*di
+        #dj = self.scaling*dj
         hps = ni*di
         vps = nj*dj
         #tdm = pp.tdm
@@ -258,9 +258,9 @@ class AnonmaskCreator(object):
         m = _AbstractMatrixParser.undoTransformation(tdm.aligned,dict(
             x=0,y=0,rot=tdm.trans["rot"],flip=tdm.trans["flip"]
         ))
-        dots_proto = [((x*di), (y*dj))
+        dots_proto = [((x*di*self.scaling), (y*dj*self.scaling))
             for x in range(m.shape[0]) for y in range(m.shape[1]) 
-            if m[x,y] == 1]
+            if m[x,y] == 1] # TODO: move scaling factor to AnonmaskApplier
         
         # set correct hps,vps for offset patterns
         hps2 = hps*prototypeHps[pp.pattern]
@@ -277,6 +277,24 @@ class AnonmaskCreator(object):
         yOffsets = [(tdm.atY/pp.yd.imgDpi-tdm.trans["y"]*dj)%vps2
             for tdm in tdms]
         yOffset = circmean(yOffsets, high=vps2)
+        
+        self.im = rotateImage(self.im, -pp.yd.rotation)
+        print("Rotating by %f°"%-pp.yd.rotation)
+        
+        # find scan margin dx, dy and subtract from offset
+        dd = [((markerScanx/pp.yd.imgDpi-markerx/self.scaling), 
+                (markerScany/pp.yd.imgDpi-markery/self.scaling))
+            for (markerScanx,markerScany),(markerx,markery) 
+            in zip(self._getMagentaMarkers(),CALIBRATION_MARKERS)]
+        dx = np.average([x for x,y in dd])
+        dy = np.average([y for x,y in dd])
+        xOffset = (xOffset-dx*self.scaling)%hps2
+        yOffset = (yOffset-dy*self.scaling)%vps2
+        
+        hps *= self.scaling # TODO: move to AnonmaskApplier
+        vps *= self.scaling
+        xOffset *= self.scaling
+        yOffset *= self.scaling
         
         if pp.tdm.trans["rot"]%2 == 1:
             xOffset, yOffset = yOffset, xOffset
