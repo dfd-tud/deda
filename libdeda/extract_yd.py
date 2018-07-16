@@ -872,7 +872,8 @@ def rotateImage(image, angle, interpolation=cv2.INTER_LINEAR):
         flags=interpolation+cv2.WARP_FILL_OUTLIERS)
     return new_image
   
+main = lambda: Main()()
 
 if __name__ == "__main__":
-    Main()()
+    main()
 
