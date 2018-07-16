@@ -32,6 +32,7 @@ HALFTONES_BLUR = 20 #70 # blur factor to get rid of halftones
 COLOUR_THRESHOLD = 233 # transform input to back & white to see printed spots
 YELLOW_GREEDY = ((18,3,214),(39,120,255)) # [Hue, Saturation, Value] range of yellow dots #((16,), [42,67,...])
 YELLOW_STRICT = ((16,10,214),(42,67,255))
+YELLOW_PURE = ((28,250,250), (32,255,255))
 YELLOW2 = ((29,11,214),(33,82,255))#((16,20,214),(42,82,255))#((16,10,214),(42,67,255))
 YELLOW_STRICTHUE = ((25,10,214),(35,120,255))
 YELLOW_STRICTHUE_GREEDYSAT = ((25,1,214),(35,120,255))
