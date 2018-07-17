@@ -101,14 +101,10 @@ class AnonmaskCreator(object):
 
     def __call__(self, *args, **xargs):
         self.restoreOrientation()
-        #cv2.imwrite("orientation.png",self.im)
-        #cv2.imwrite("magenta.png",self._selectColour(MAGENTA))
-        #self.restoreSkew()
+        self.restoreSkewByDots()
         self._magentaMarkers = self._getMagentaMarkers()
         self.getPageScaling()
-        #self.dpi *= self.scaling
-        #cv2.imwrite("perspective.png",self.im)
-        #self.restorePerspective() #FIXME: rotation statt perspective?
+        self.restorePerspective()
         maskdata = self.createMask(*args, **xargs)
         return json.dumps(maskdata).encode("ascii")
         
@@ -166,11 +162,17 @@ class AnonmaskCreator(object):
         inputPoints = np.array(edges,dtype=np.float32)
         return inputPoints
         
-    def restoreSkew(self):
+    def restoreSkewByMarkers(self):
         _,_, angle = cv2.minAreaRect(self._getMagentaMarkers())
         angle = angle%90 if angle%90<45 else angle%90-90
         print("Skew correction: rotating by %+f°"%angle)
         self.im = rotateImage(self.im, angle, cv2.INTER_NEAREST)
+    
+    def restoreSkewByDots(self):
+        pp = PrintParser(self.im,ydxArgs=dict(
+            inputDpi=self.dpi,interpolation=cv2.INTER_NEAREST))
+        self.im = rotateImage(self.im, -pp.yd.rotation)
+        print("Rotating by %f°"%-pp.yd.rotation)
         
     def getPageScaling(self):
         dist = lambda p1,p2:(abs(p1[0]-p2[0])**2+abs(p1[1]-p2[1])**2)**.5
@@ -201,6 +203,7 @@ class AnonmaskCreator(object):
         self.im = cv2.warpPerspective(self.im,l,testpageSizePx,
             #flags=cv2.INTER_LINEAR+cv2.WARP_FILL_OUTLIERS)
             flags=cv2.INTER_NEAREST+cv2.WARP_FILL_OUTLIERS)
+        self.dpi *= self.scaling
         
     def createMask(self, copy):
         """
@@ -210,12 +213,13 @@ class AnonmaskCreator(object):
         #cv2.imwrite("perspective.png",self.im)
         # get tracking dot matrices
         pp = PrintParser(self.im,ydxArgs=dict(
-            inputDpi=self.dpi,interpolation=cv2.INTER_NEAREST))
+            inputDpi=self.dpi,interpolation=cv2.INTER_NEAREST,
+            rotation=False))
         tdms = list(pp.getAllValidTdms())
         print("\t%d valid matrices"%len(tdms))
         
-        #"""
         # select tdm
+        #"""
         # tdms := [closest TDM at edge \forall edge \in Edges]
         # |tdms| = |Edges|
         #pp.tdm = random.choice(tdms)
@@ -278,10 +282,11 @@ class AnonmaskCreator(object):
             for tdm in tdms]
         yOffset = circmean(yOffsets, high=vps2)
         
-        self.im = rotateImage(self.im, -pp.yd.rotation)
-        print("Rotating by %f°"%-pp.yd.rotation)
+        #self.im = rotateImage(self.im, -pp.yd.rotation)
+        #print("Rotating by %f°"%-pp.yd.rotation)
         
         # find scan margin dx, dy and subtract from offset
+        """
         dd = [((markerScanx/pp.yd.imgDpi-markerx/self.scaling), 
                 (markerScany/pp.yd.imgDpi-markery/self.scaling))
             for (markerScanx,markerScany),(markerx,markery) 
@@ -290,6 +295,7 @@ class AnonmaskCreator(object):
         dy = np.average([y for x,y in dd])
         xOffset = (xOffset-dx*self.scaling)%hps2
         yOffset = (yOffset-dy*self.scaling)%vps2
+        #"""
         
         hps *= self.scaling # TODO: move to AnonmaskApplier
         vps *= self.scaling
