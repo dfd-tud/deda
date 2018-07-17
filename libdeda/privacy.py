@@ -19,6 +19,7 @@ try: import Image
 except ImportError: from PIL import Image
 try: import wand
 except ImportError: pass
+else: from wand.image import Image as WandImage
 import libdeda.pypdf2patch
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from reportlab.pdfgen import canvas
@@ -338,15 +339,16 @@ class AnonmaskApplier(object):
         self.pagesize = d["pagesize"]
         if dotRadius: self.dotRadius = dotRadius
         if debug: self.colour = MAGENTA
-        self.maskpdf = self._createMask()
 
     def apply(self, inPdf):
+        inPdf = self.pdfNormaliseFormat(inPdf,*self.pagesize) # force A4
         if "wand" in globals():
-            return self.pdfWatermark(inPdf, self._createMask, maskOnTop=True)
+            return self.pdfWatermark(inPdf, self._createMask, True)
         else: 
+            self.maskpdf = self._createMask()
             return self.pdfWatermark(inPdf, lambda *args:self.maskpdf, False)
   
-    def _createMask(self,w=None,h=None,page=None):
+    def _createMask(self,page=None):
         w,h = self.pagesize
         w = float(w)
         h = float(h)
@@ -367,18 +369,21 @@ class AnonmaskApplier(object):
 
         if "wand" in globals():
             # PyPDF2 page to cv2 image
+            dpi = 300
             pageio = BytesIO()
             pageWriter = PdfFileWriter()
             pageWriter.addPage(page)
             pageWriter.write(pageio)
             pageio.seek(0)
-            with wand.image.Image(file=pageio,format="pdf",resolution=600) as wim:
+            with WandImage(file=pageio,format="pdf",resolution=dpi) as wim:
                 imbin = wim.make_blob("png")
             file_bytes = np.asarray(bytearray(imbin), dtype=np.uint8)
             im = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
             
             # remove dots on black spots
-            allDots = [(x,y) for x,y in allDots if im[int(y*600),int(x*600)] != (0,0,0)]
+            allDots = [(x,y) for x,y in allDots 
+                if int(y*dpi)>=im.shape[0] or int(x*dpi)>=im.shape[1] 
+                or (im[int(y*dpi),int(x*dpi)] != (0,0,0)).any()]
             
         for x,y in allDots:
             c.circle(x*72,h-y*72,self.dotRadius*72,stroke=0,fill=1)
@@ -387,14 +392,31 @@ class AnonmaskApplier(object):
         return io
     
     @staticmethod
-    def pdfWatermark(pdfin, maskCreator, maskOnTop=False):
+    def pdfNormaliseFormat(pdfin, width, height):
         """
-        For each page from pdfin, maskCreator will be called with its dimensions
-        and shall return a single page PDF to be put on top. The result is
-        written to outfile.
+        Reads a PDF as binary string and sets with and height of each page.
+        """
+        input_ = PdfFileReader(BytesIO(pdfin))
+        output = PdfFileWriter()
+        outIO = BytesIO()
+        for p_nr in range(input_.getNumPages()):
+            page = input_.getPage(p_nr)
+            outPage = output.addBlankPage(width, height)
+            outPage.mergePage(page)
+            outPage.compressContentStreams()
+        output.write(outIO)
+        outIO.seek(0)
+        return outIO.read()
+    
+    @staticmethod
+    def pdfWatermark(pdfin, maskCreator, foreground=False):
+        """
+        For each page from pdfin, maskCreator(page) will be called
+        and shall return a single page watermark PDF.
         @pdfin PDF binary or file path
         @maskCreator Function that creates the watermark for each page given 
             arguments width and height,
+        @foreground If False, put the watermark in the background,
         Returns: Pdf binary
         
         Example:
@@ -410,18 +432,16 @@ class AnonmaskApplier(object):
         
         for p_nr in range(input_.getNumPages()):
             page = input_.getPage(p_nr)
-            box = page.mediaBox
-            maskPdf = maskCreator(box.getWidth(),box.getHeight(),page)
-            maskPage = PdfFileReader(maskPdf).getPage(0)
-            outPage = output.addBlankPage(maskPage.mediaBox.getWidth(),
-                maskPage.mediaBox.getHeight())
-            if maskOnTop:
-                outPage.mergePage(page)
-                outPage.mergePage(maskPage)
+            mask = PdfFileReader(maskCreator(page)).getPage(0)
+            if foreground:
+                page.mergePage(mask)
+                output.addPage(page)
             else:
-                outPage.mergePage(maskPage)
-                outPage.mergePage(page)
-            outPage.compressContentStreams()
+                maskCp = output.addBlankPage(page.mediaBox.getWidth(),
+                    page.mediaBox.getHeight())
+                maskCp.mergePage(mask)
+                maskCp.mergePage(page)
+            output.getPage(p_nr).compressContentStreams()
         
         outIO = BytesIO()
         output.write(outIO)
