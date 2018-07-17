@@ -102,6 +102,7 @@ class AnonmaskCreator(object):
     def __call__(self, *args, **xargs):
         self.restoreOrientation()
         self.restoreSkewByDots()
+        #self.restoreSkewByMarkers()
         self._magentaMarkers = self._getMagentaMarkers()
         self.getPageScaling()
         self.restorePerspective()
@@ -232,7 +233,6 @@ class AnonmaskCreator(object):
             )] for e1, e2 in edges]
         #"""
         
-        #print("TDMs: %s"%", ".join([tdm.decode().get("serial","") for tdm in tdms]))
         print("\tTracking dots pattern found:")
         print("\tx=%d, y=%d, trans=%s"%(pp.tdm.atX,pp.tdm.atY,pp.tdm.trans))
         ni,nj,di,dj = patternDict[pp.pattern]
@@ -262,9 +262,9 @@ class AnonmaskCreator(object):
         m = _AbstractMatrixParser.undoTransformation(tdm.aligned,dict(
             x=0,y=0,rot=tdm.trans["rot"],flip=tdm.trans["flip"]
         ))
-        dots_proto = [((x*di*self.scaling), (y*dj*self.scaling))
+        dots_proto = [((x*di), (y*dj))
             for x in range(m.shape[0]) for y in range(m.shape[1]) 
-            if m[x,y] == 1] # TODO: move scaling factor to AnonmaskApplier
+            if m[x,y] == 1]
         
         # set correct hps,vps for offset patterns
         hps2 = hps*prototypeHps[pp.pattern]
@@ -297,11 +297,6 @@ class AnonmaskCreator(object):
         yOffset = (yOffset-dy*self.scaling)%vps2
         #"""
         
-        hps *= self.scaling # TODO: move to AnonmaskApplier
-        vps *= self.scaling
-        xOffset *= self.scaling
-        yOffset *= self.scaling
-        
         if pp.tdm.trans["rot"]%2 == 1:
             xOffset, yOffset = yOffset, xOffset
         print("TDM offset: %f, %f"%(xOffset,yOffset))
@@ -324,19 +319,21 @@ class AnonmaskApplier(object):
     dotRadius = 0.004 #in
 
     def __init__(self, mask, dotRadius=None, xoffset=None, 
-                yoffset=None, debug=False):
+                yoffset=None, debug=False, scale=None):
         d = json.loads(mask)
         if d.get("format_ver",0) < MASK_VERSION:
             raise Exception("Incompatible format version by mask. "
                 "Please generate AND print a new calibration page (see "
                 "deda_anonmask_create).")
         proto = d["proto"]
-        scale = d.get("scale",1)
+        self.scale = scale or d.get("scale",1)
         self.hps = d["hps"]
         self.vps = d["vps"]
         self.xOffset = xoffset or d["x_offset"]
         self.yOffset = yoffset or d["y_offset"]
-        self.proto = [((xDot%d["hps"]+self.xOffset*scale)%self.hps,(yDot%d["vps"]+self.yOffset*scale)%self.vps)
+        
+        self.proto = [
+            ((xDot+self.xOffset)%self.hps, (yDot+self.yOffset)%self.vps)
             for xDot, yDot in proto]
         self.pagesize = d["pagesize"]
         if dotRadius: self.dotRadius = dotRadius
@@ -353,16 +350,18 @@ class AnonmaskApplier(object):
         w,h = self.pagesize
         w = float(w)
         h = float(h)
+        shps = self.hps*self.scale
+        svps = self.vps*self.scale
         io = BytesIO()
         c = canvas.Canvas(io, pagesize=(w,h) )
         c.setStrokeColorRGB(*self.colour)
         c.setFillColorRGB(*self.colour)
         allDots = []
-        for x_ in range(int(w/self.hps/72+1)):
-            for y_ in range(int(h/self.vps/72+1)):
+        for x_ in range(int(w/shps/72+1)):
+            for y_ in range(int(h/svps/72+1)):
                 for xDot, yDot in self.proto:
-                    x = (x_*self.hps+xDot)
-                    y = (y_*self.vps+yDot)
+                    x = (x_*shps+xDot*self.scale)
+                    y = (y_*svps+yDot*self.scale)
                     if x*72 > w or y*72 > h: continue
                     allDots.append((x,y))
 
