@@ -17,6 +17,8 @@ From PyPI:
 `$ pip3 install --user deda`
 Or from current directory:
 `$ pip3 install --user .`
+* Optional requirement by deda_anonmask_apply (GNU/Linux only):
+`$ pip3 install wand`
 
 
 #### 1. Reading tracking data   
@@ -63,6 +65,8 @@ zero page margin setting.
 Check whether a masked page covers your printer's tracking dots by using a 
 microscope. The mask's dot radius, x and y offsets can be customised and 
 passed to `deda_anonmask_apply` as parameters.
+
+Note that if DOCUMENT.PDF contains graphics with white or light coloured parts, these can only be masked if "wand" is installed (see above).
 
 
 #### 6. Troubleshooting
