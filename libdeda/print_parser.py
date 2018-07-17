@@ -93,6 +93,8 @@ class PrintParser(object):
             self._print("%s\n"%repr(e))
         else:
             self._print("\n")
+            self.colourProfile = cp
+            self.colourProfileId = i
             break
     if self.pattern is None: 
         raise exceptions[0]
