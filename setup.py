@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='deda',
-      version='1.0-beta2',
+      version='2.0-beta1',
       python_requires='>=3.3',
       description='tracking Dots Extraction, Decoding and Anonymisation toolkit',
       long_description=long_description,
