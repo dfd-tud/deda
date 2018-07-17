@@ -43,9 +43,11 @@ class Main(object):
         print("\tTDM x offset: \t%f"%aa.xOffset)
         print("\tTDM y offset: \t%f"%aa.yOffset)
         print("\tDot radius: \t%f"%aa.dotRadius)
+        print("\tScaling: \t%f"%aa.scale)
         
         with open(OUTFILE,"wb") as pdfout:
-            pdfout.write(aa.apply(self.args.page))
+            with open(self.args.page, "rb") as pdfin:
+                pdfout.write(aa.apply(pdfin.read()))
         print("Document written to '%s'"%OUTFILE)
 
 
