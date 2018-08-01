@@ -13,9 +13,9 @@ import cv2
 import eel
 import os, sys
 import numpy as np
-from libdeda.print_parser import *
-from libdeda.extract_yd import ImgProcessingMixin
-from libdeda.privacy import AnonmaskApplier, calibrationScan2Anonmask
+from libdeda.print_parser import PrintParser, comparePrints
+from libdeda.privacy import AnonmaskApplier, calibrationScan2Anonmask, \
+    cleanScan
 
 
 def main():
@@ -38,22 +38,24 @@ def main():
 
     def forensicAction(imgfile):
         try:
-            pp = PrintParser(imgfile)
+            with open(imgfile,"rb") as fp:
+                pp = PrintParser(fp.read())
         except YD_Parsing_Error as e: pattern = None
         else: pattern = pp.pattern
         print(pattern)
         if pattern is None:
-            result = 'No tracking dot pattern detected.'
+            result = ('No tracking dot pattern detected. For best results '
+                'try a 300 dpi scan and a lossless file format.')
             return result
         result_pattern = pp.pattern
 
-        tdm = pp.getValidMatrixFromSheet()
-        if tdm is None: return 'Tracking Dots detected, but no valid TDM could be extracted.'
+        if pp.tdm is None: return 'Tracking Dots detected, but no valid TDM could be extracted.'
 
         #create table with yd matrix
         result_matrix = '<table class="table table-bordered table-sm table-dark table-hover text-center" id="tdmtable"><tbody>'
-        tdmlist = str(tdm).split('\t')[0].split('\n')
-        countdots = str(str(tdm).split('\t')[1])
+        tdmlist = str(pp.tdm).split('\t')[0].split('\n')
+        countdots = str(np.sum(pp.tdm.aligned==1))
+        #countdots = str(str(pp.tdm).split('\t')[1])
 
         for i in tdmlist:
             if len(i)>0:
@@ -67,7 +69,7 @@ def main():
         result_matrix += '</tbody></table>'
 
         #create table with decoding results
-        dec = tdm.decode()
+        dec = pp.tdm.decode()
         result_decoding = '<table class="table table-bordered table-sm table-hover" id="resulttable"><tbody>'
         result_decoding += '<tr><th scope="row">Analysed Image</th><td>' + os.path.split(imgfile)[1] + '</td></tr>'
         result_decoding += '<tr><th scope="row">Detected Pattern</th><td>' + str(result_pattern) + '</td></tr>'
@@ -125,17 +127,12 @@ def main():
         printers = {}
         errors = []
         info = ""
+        files = []
         for f in file_uploads:
-            try:
-                pp = PrintParser(f)
-            except Exception as e:
-                errors.append((e,f))
-            else:
-                info = pp.tdm.decode()
-                p = info["printer"]
-                printers[p] = printers.get(p,[])+[(f,info)]
+            with open(f,"rb") as fp: files.append(fp.read())
+        printers, errors, identical = comparePrints(files)
 
-        if len(printers) == 1 and len(errors) == 0:
+        if identical:
             info = "The tracking dots of all input images have been detected as IDENTICAL."
         elif len(printers) == 1:
             info = str(len(file_uploads)-len(errors)) + ' of ' + str(len(file_uploads)) + ' images were succesfully analysed and have been detected as IDENTICAL. <br> ' + str(len(errors)) + ' images have no tracking dots or could not be extracted.'
@@ -148,13 +145,13 @@ def main():
 
         result_compare = '<table class="table table-bordered table-sm table-hover" id="resulttable">'
         result_compare += '<thead><tr><th scope="col">#</th><th scope="col">Printer Information</th><th scope="col">Files</th></tr></thead><tbody>'
-        for i, (printerId, filesinfo) in enumerate(printers.items()):
+        for i, p in enumerate(printers):
             result_compare += '<tr><th scope="row">' + str(i+1) + '</th>'
             result_compare += '<td>'
-            for key,val in filesinfo[0][1].items():
-                result_compare += '<i>' + key.title() + '</i>: ' + val + '<br>'
+            #for key,val in filesinfo[0][1].items():
+            #    result_compare += '<i>' + key.title() + '</i>: ' + val + '<br>'
             result_compare += '</td><td>'
-            for f, sets in filesinfo:
+            for f in p["files"]:
                 result_compare += f + '<hr id="table_hr">'
             result_compare += '</td></tr>'
 
@@ -180,15 +177,14 @@ def main():
             path, filename = os.path.split(upload)
             path = path + '/'
             if(filext=='.jpeg' or filext=='.jpg' or filext=='.png' or filext=='.tiff' or filext=='.bmp'):
-                improcess = ImgProcessingMixin(upload)
-                improcess._verbosity = 0
-                im = cv2.imread(upload)
-                _, mask = improcess.processImage(im,workAtDpi=None,halftonesBlur=10,ydColourRange=((16,1,214),(42,120,255)),paperColourThreshold=225)
-                im[mask==255] = 255
+                ext = os.path.splitext(os.path.basename(upload))[1]
+                with open(upload,"rb") as fpin:
+                    outfile = cleanScan(fpin.read(),outformat=ext)
                 if(savepath == ''):
-                    output = os.path.splitext(os.path.basename(upload))[0] + '_anon' + os.path.splitext(os.path.basename(upload))[1]
+                    output = os.path.splitext(os.path.basename(upload))[0] + '_anon' + ext
                     save = path + output
-                    cv2.imwrite(save, im)
+                    with open(save, "wb") as fpout:
+                        fpout.write(outfile)
                     info = 'Document anonymized and saved.<br>'
                     result = '<table class="table table-bordered table-sm table-dark table-hover text-center" id="resulttable"><tbody>'
                     result += '<tr><th scope="row">Path</th><td>' + path + '</td></tr>'
@@ -217,8 +213,11 @@ def main():
 
             if(filext=='.jpeg' or filext=='.jpg' or filext=='.png' or filext=='.tiff' or filext=='.bmp'):
                 try:
-                    TestpageParser(upload)()
-                    return 'Done. Mask was generated and saved as ' + path + 'mask.json'
+                  with open(upload,"rb") as fpin:
+                    with open("mask.json","wb") as fpout: 
+                        fpout.write(
+                          calibrationScan2Anonmask(fpin.read(), copy=False))
+                  return 'Done. Mask was generated and saved as ' + path + 'mask.json'
                 except:
                     return 'An Error occoured.'
             else:
@@ -231,45 +230,47 @@ def main():
     #---
     @eel.expose
     def applyMask(page, mask, x, y, dotradius):
-        if os.path.isfile(page):
-            if os.path.isfile(mask):
-                pagename, pageext = os.path.splitext(page)
-                pageext = pageext.lower()
-                pagepath = os.path.split(page)[0] + '/'
-                maskext = os.path.splitext(mask)[1].lower()
-                if(pageext=='.ps'):
-                    if(maskext=='.json'):
-                        try:
-                            if (x==''): x = None
-                            else: x = float(x)
-                            if (y==''): y = None
-                            else: y = float(y)
-                            if (dotradius==''): dotradius = 0.004
-                            else: dotradius = float(dotradius)
-                            xoff, yoff, dotrad = ApplyMask(page,mask,x,y,dotradius)()
-                            text_file = open(pagename + "_masked.txt", "w")
-                            text_file.write("X-Offset: %s \ny-Offset: %s \nDotradius: %s" % (xoff, yoff, dotrad))
-                            text_file.close()
-                            info = 'Done'
-                            result = '<table class="table table-bordered table-sm table-dark table-hover text-center" id="resulttable"><tbody>'
-                            result += '<tr><th scope="row">Masked Document</th><td>' + pagename + '_masked.ps</td></tr>'
-                            result += '<tr><th scope="row">Info File</th><td>' + pagename + '_masked.txt</td></tr>'
-                            result += '<tr><th scope="row">x-Offset</th><td>' + str(round(xoff,4)) + '</td></tr>'
-                            result += '<tr><th scope="row">y-Offset</th><td>' + str(round(yoff,4)) + '</td></tr>'
-                            result += '<tr><th scope="row">Dotradius</th><td>' + str(dotrad) + '</td></tr></tbody></table>'
-                            #send output to javascript
-                            eel.print_result(result)
-                            return info
-                        except:
-                            return 'An Error occoured.'
-                    else:
-                        return 'Not a valid Mask File (json).'
-                else:
-                    return 'Not a valid Document File - please provide a PostScript Document.'
-            else:
-                return 'Not a valid Path to Mask File.'
-        else:
+        if not os.path.isfile(page): 
             return 'Not a valid Path to Document File.'
+        if not os.path.isfile(mask): return 'Not a valid Path to Mask File.'
+        pagename, pageext = os.path.splitext(page)
+        pageext = pageext.lower()
+        pagepath = os.path.split(page)[0] + '/'
+        maskext = os.path.splitext(mask)[1].lower()
+        if not (pageext=='.pdf'): 
+            return ('Not a valid Document File - please provide a PDF ' 
+                'Document.')
+        if not (maskext=='.json'): return 'Not a valid Mask File (json).'
+        try:
+            if (x==''): x = None
+            else: x = float(x)
+            if (y==''): y = None
+            else: y = float(y)
+            if (dotradius==''): dotradius = 0.004
+            else: dotradius = float(dotradius)
+            with open(mask,"rb") as fp:
+                aa = AnonmaskApplier(fp.read(),dotradius,x,y)
+            with open("%s_masked.pdf"%pagename,"wb") as pdfout:
+                pdfout.write(aa.apply(pdfin.read()))
+            
+            xoff = aa.xOffset
+            yoff = aa.yOffset
+            dotrad = aa.dotRadius
+            text_file = open(pagename + "_masked.txt", "w")
+            text_file.write("X-Offset: %s \ny-Offset: %s \nDotradius: %s" % (xoff, yoff, dotrad))
+            text_file.close()
+            info = 'Done'
+            result = '<table class="table table-bordered table-sm table-dark table-hover text-center" id="resulttable"><tbody>'
+            result += '<tr><th scope="row">Masked Document</th><td>' + pagename + '_masked.pdf</td></tr>'
+            result += '<tr><th scope="row">Info File</th><td>' + pagename + '_masked.txt</td></tr>'
+            result += '<tr><th scope="row">x-Offset</th><td>' + str(round(xoff,4)) + '</td></tr>'
+            result += '<tr><th scope="row">y-Offset</th><td>' + str(round(yoff,4)) + '</td></tr>'
+            result += '<tr><th scope="row">Dotradius</th><td>' + str(dotrad) + '</td></tr></tbody></table>'
+            #send output to javascript
+            eel.print_result(result)
+            return info
+        except:
+            return 'An Error occoured.'
 
 
     #---
