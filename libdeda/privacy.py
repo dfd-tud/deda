@@ -25,8 +25,7 @@ from PyPDF2 import PdfFileReader, PdfFileWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib import pagesizes
 from colorsys import rgb_to_hsv
-from libdeda.print_parser import PrintParser, patternDict, prototypeHps, \
-    prototypeVps
+from libdeda.print_parser import PrintParser
 from libdeda.extract_yd import rotateImage, matrix2str, ImgProcessingMixin
 from libdeda.cmyk_to_rgb import CYAN, MAGENTA, BLACK, YELLOW
 from libdeda.pattern_handler import _AbstractMatrixParser
@@ -236,11 +235,12 @@ class AnonmaskCreator(object):
         
         print("\tTracking dots pattern found:")
         print("\tx=%d, y=%d, trans=%s"%(pp.tdm.atX,pp.tdm.atY,pp.tdm.trans))
-        ni,nj,di,dj = patternDict[pp.pattern]
+        di = pp.pattern.d_i
+        dj = pp.pattern.d_j
+        hps = pp.pattern.hps
+        vps = pp.pattern.vps
         #di = self.scaling*di
         #dj = self.scaling*dj
-        hps = ni*di
-        vps = nj*dj
         #tdm = pp.tdm
         #tdms = sorted(tdms,key=lambda e:e.atY+e.atX)
         """
@@ -268,8 +268,8 @@ class AnonmaskCreator(object):
             if m[x,y] == 1]
         
         # set correct hps,vps for offset patterns
-        hps2 = hps*prototypeHps[pp.pattern]
-        vps2 = vps*prototypeVps[pp.pattern]
+        hps2 = di*pp.pattern.n_i_prototype
+        vps2 = dj*pp.pattern.n_j_prototype
         
         # Calc xOffset and yOffset: Distance from (0,0) to the first marking
         # dots

@@ -10,7 +10,7 @@ Example:
     for m in YDX("input.jpg").matrices:
         transformations = patterns[2].getTransformations(m)
         for t in transformations:
-            tdm = TDM(m=m, pattern=2, trans=t)
+            tdm = TDM(m=m, pattern=patterns[2], trans=t)
             if tdm.check(): 
                 print(tdm)
                 print(tdm.decode())
@@ -89,6 +89,33 @@ class _MatrixParserInterface(object):
 
 class _AbstractMatrixParser(_MatrixParserInterface):
 
+    # Size
+    n_i = -1
+    n_j = -1
+    d_i = -1
+    d_j = -1
+    
+    # When reading, do a majority decision for @minCount TDMs. At least this
+    # amount of valid TDMs has to be detected for a certain pattern. -1=all
+    minCount = 1
+    
+    # For offset patterns: Define distance between markers, default: n_i, n_j
+    n_i_prototype = property(lambda self:self.n_i)
+    n_j_prototype = property(lambda self:self.n_j)
+    
+    hps = property(lambda self:self.n_i*self.d_i)
+    vps = property(lambda self:self.n_j*self.d_j)
+    
+    def __int__(self):
+        return int(''.join(list(
+            filter(str.isdigit, self.__class__.__name__))))
+    
+    def __str__(self):
+        return "Pattern %d"%int(self)
+    
+    def __hash__(self):
+        return hash(self.__class__.__name__)
+    
     def checkAnyRolling(self,m):
         return True
 
@@ -163,7 +190,14 @@ class _AbstractMatrixParser(_MatrixParserInterface):
         
 
 class Pattern1(_AbstractMatrixParser):
-
+  
+  n_i = 32
+  n_j = 32
+  d_i = .02
+  d_j = .02
+  n_i_prototype = 16
+  n_j_prototype = 16
+  minCount = -1
   alignments=[
     dict(nempty=[(0,0),(1,0)],
         empty=[(x,y) for x in range(0,16) for y in (2,4,6,8,10,12,14)]\
@@ -232,6 +266,10 @@ class Pattern1(_AbstractMatrixParser):
 
 class Pattern2(_AbstractMatrixParser):
 
+  n_i = 18
+  n_j = 23
+  d_i = .03
+  d_j = .03
   alignment = dict(empty=[(0,0),(2,1)],
         nempty=[(1,1),(1,0),(0,1)],allowFlip=True)
   manufacturers = {"3210": "Okidata", "3021": "HP", "2310": "Ricoh", 
@@ -299,14 +337,22 @@ class Pattern2(_AbstractMatrixParser):
     return anon
     
 
-class Pattern3(Pattern2):
+class Pattern21(Pattern2):
 
+  n_i = 23
+  n_j = 18
   alignment = dict(empty=[(0,0),(2,1)],
     nempty=[(1,1),(1,0),(0,1)],allowFlip=True,rot=1)
 
 
-class Pattern4(_AbstractMatrixParser):    
+class Pattern3(_AbstractMatrixParser):    
 
+  n_i = 24
+  n_j = 48
+  d_i = .02
+  d_j = .02
+  n_i_prototype = None
+  n_j_prototype = None
   #alignment = dict(nempty = [(0,4+1),(0,1+1),(2,1+1)])
   alignment = dict(nempty = [(0,4),(0,1),(2,1)])
   blocks = [[((bx*4+by+x)%24,(3*by+1+y)%16) for y in range(3) for x in range(2)]
@@ -356,13 +402,19 @@ class Pattern4(_AbstractMatrixParser):
     return self.applyCopies(anon)
 
 
-class Pattern41(Pattern4):
+class Pattern31(Pattern3):
 
+  n_i = 48
+  n_j = 24
   alignment = dict(nempty = [(0,5),(0,2),(2,2)],rot=1)
 
 
-class Pattern5(_AbstractMatrixParser):
+class Pattern4(_AbstractMatrixParser):
 
+  n_i = 16
+  n_j = 32
+  d_i = .04
+  d_j = .04
   alignment=dict(empty = [(x,y) for x in range(8,16) for y in range(0,17)],
     allowFlip=True) #nempty = [(x,6) for x in range(1,4)] #1,8
   manufacturers = {0:"Xerox", 3:"Epson", 20: "Dell", 4: "Xerox"}
@@ -427,19 +479,17 @@ class Pattern5(_AbstractMatrixParser):
     return self.applyCopies(anon)
 
 
-class Pattern6(Pattern5):
+class Pattern41(Pattern4):
 
+  n_i = 32
+  n_j = 16
   alignment=dict(empty = [(x,y) for x in range(8,16) for y in range(0,17)],
     allowFlip=True,rot=1)
 
 
-class Patterns(object):
-    
-    def __getitem__(self, name):
-        return globals()["Pattern%d"%name]()
-        
-
-patterns = Patterns()    
+patterns = {int(cls()):cls() 
+    for name, cls in globals().items() 
+    if name.startswith("Pattern")}
 
 
 class TDM(object):
@@ -453,7 +503,7 @@ class TDM(object):
         One of @m or @aligned is required. @aligned must be @m transformed
             according to @trans.
         
-        pattern int patternId,
+        pattern _MatrixParserInterface pattern object,
         trans dict transformation dict,
         atX int position on paper in pixels,
         atY int,
@@ -465,24 +515,23 @@ class TDM(object):
         self.pattern = pattern
         self.atX = atX
         self.atY = atY
-        self.parser = patterns[pattern]
         self.trans = trans
-        self.aligned = self.parser.applyTransformation(m,self.trans) if \
+        self.aligned = self.pattern.applyTransformation(m,self.trans) if \
             aligned is None else aligned
-        self.cropped = self.parser.crop(self.aligned) if cropped is None \
+        self.cropped = self.pattern.crop(self.aligned) if cropped is None \
             else cropped
         
     def __getattr__(self, name):
-        return getattr(self.parser,name)(self.m)
+        return getattr(self.pattern,name)(self.m)
         
     def decode(self):
-        return self.parser.decode(self.cropped)
+        return self.pattern.decode(self.cropped)
         
     def check(self):
-        return self.cropped is not None and self.parser.check(self.cropped)
+        return self.cropped is not None and self.pattern.check(self.cropped)
         
     def createMask(self, addTdm=True):
-        mask = self.parser.createMask(self.aligned)
+        mask = self.pattern.createMask(self.aligned)
         if addTdm: mask = np.array((self.aligned+mask)>0,dtype=np.uint8)
         return TDM(
             aligned=mask,atX=self.atX,atY=self.atY,
@@ -496,7 +545,7 @@ class TDM(object):
             self.pattern,self.atX,self.atY)
         
     def undoTransformation(self):
-        return self.parser.undoTransformation(self.aligned,self.trans)
+        return self.pattern.undoTransformation(self.aligned,self.trans)
         
     def __hash__(self):
         if self.cropped is None: return hash(None)

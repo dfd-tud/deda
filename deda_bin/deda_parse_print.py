@@ -67,7 +67,7 @@ class Main(object):
         except Exception as e:
             print("\tDecoding error: %s"%repr(e))
         """
-        if len(pp.validMatrices) > 1:
+        if len(set(pp.validMatrices)) > 1:
             print("\nAll valid TDMS:")
             for tdm in set(pp.validMatrices):
                 print("\t%d x %s"%(

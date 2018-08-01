@@ -26,30 +26,6 @@ from libdeda.extract_yd import YDX, TooManyDotsException, matrix2str, \
 from libdeda.pattern_handler import patterns, TDM
 
 
-knownPatterns = [
-    #patternId, ni, nj, di, dj, min. score for successful detection (-1=max)
-    (1, 32,32,.02,.02,  -1),
-    (2, 18,23,.03,.03,  1),
-    (3, 23,18,.03,.03,  1),
-    (4, 24,48,.02,.02,  1),
-    (5, 16,32,.04,.04,  1),
-    (6, 32,16,.04,.04,  1),
-    (41,48,24,.02,.02,  1),
-]
-"""
-    hps x vps
-    1:64x64
-    2:54x69
-    4:48x96
-    5:64x128
-"""
-
-patternDict = {e[0]:e[1:5] for e in knownPatterns}
-patternLimits = {e[0]:e[-1] for e in knownPatterns}
-prototypeHps = {1:.5, 2:1, 3:1, 4:None, 5:.5, 6:.5, 41:None}
-prototypeVps = {1:.5, 2:1, 3:1, 4:None, 5:.5, 6:.5, 41:None}
-
-
 class YD_Parsing_Error(Exception): 
 
     def __init__(self, msg, yd):
@@ -123,12 +99,13 @@ class PrintParser(object):
 
     # make mmList: interpretation of a sheet under any pattern
     mmLists = {}
-    for p,patternParams in patternDict.items():
+    for pattern in patterns.values():
         self._print(".")
-        ni,nj,di,dj = patternParams
-        mm = self.yd.getAllMatrices(*patternParams)#,cutLength=(ni*di,nj*dj))
+        mm = self.yd.getAllMatrices(
+            pattern.n_i, pattern.n_j, pattern.d_i, pattern.d_j
+        )#,cutLength=(ni*di,nj*dj))
         mm = [(meta,m) for meta,m in mm if .5 not in m and 1 in m]
-        mmLists[p] = mm
+        mmLists[pattern] = mm
     self._print(" %s"%", ".join(["p%d: %d"
         %(p,len(mm)) for p,mm in mmLists.items()]))
     self._print("\n")
@@ -145,11 +122,11 @@ class PrintParser(object):
             validMatrices[p] = validMatrices.get(p,[])+[tdm]
             candidates[p] = candidates.get(p,0)+1
         ci = sorted(candidates.items(),
-            key=lambda e:e[1]*10+e[0],reverse=True)
+            key=lambda e:e[1]*10+int(e[0]),reverse=True)
         self._print(("\rTesting matrix #%d. "%i)+
             ", ".join(["p%d: %d"%(p,amount) for p,amount in ci]))
-        for p,ni,nj,di,dj,s in knownPatterns:
-            if s>0 and candidates.get(p,-1) >= s:
+        for p in patterns.values():
+            if p.minCount>0 and candidates.get(p,-1) >= p.minCount:
                 self._print("\n")
                 self.validMatrices = validMatrices[p]
                 self.allTDMs = mmLists[p]
@@ -158,7 +135,7 @@ class PrintParser(object):
                 return p
         i += 1
     self._print("\n")
-    if len(ci)>0 and patternLimits[ci[0][0]] == -1:
+    if len(ci)>0 and ci[0][0].minCount == -1:
         p = ci[0][0]
         self.validMatrices = validMatrices[p]
         self.allTDMs = mmLists[p]
@@ -171,12 +148,11 @@ class PrintParser(object):
   def _get_dxy(self, x,y, pattern):
         """ Returns avg distance between cell edge and dot """
         #return 0,0
-        ni,nj,di,dj = patternDict[pattern]
-        di = di*self.yd.imgDpi
-        dj = dj*self.yd.imgDpi
+        di = pattern.d_i*self.yd.imgDpi
+        dj = pattern.d_j*self.yd.imgDpi
         #return di/2, dj/2
-        hps = ni*di
-        vps = nj*dj
+        hps = pattern.n_i*di
+        vps = pattern.n_j*dj
         dots = self.yd.dots.T
         coords = dots[:,(dots[0] >= x) * (dots[0] < x+hps) *
             (dots[1] >= y) * (dots[1] < y+vps)]
@@ -189,12 +165,12 @@ class PrintParser(object):
         x = cropx+gridx+cellx
         y = cropy+gridy+celly
         x_,y_=self._get_dxy(x,y,p)
-        for t in patterns[p].getTransformations(m):
+        for t in p.getTransformations(m):
             tdm = TDM(pattern=p,m=m,trans=t,
                 atX=x+x_,atY=y+y_)
             tdm.meta_position = meta+(x_,y_)
             yield tdm
-            #[tdm for t in patterns[p].getTransformations(m) 
+            #[tdm for t in p.getTransformations(m) 
             #for tdm in [TDM(pattern=p,m=m,trans=t,atX=x,atY=y)] 
             #if tdm.check() == True]
    
