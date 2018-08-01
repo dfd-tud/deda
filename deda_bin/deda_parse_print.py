@@ -36,7 +36,8 @@ class Main(object):
     
     def __call__(self):
         try:
-          pp = PrintParser(self.args.file,ydxArgs=dict(mask=self.args.mask,
+          with open(self.args.file, "rb") as fp:
+            pp = PrintParser(fp.read(),ydxArgs=dict(mask=self.args.mask,
                   verbose=max(-1,self.args.verbose-1),inputDpi=self.args.dpi),
               verbose=self.args.verbose)
         except YD_Parsing_Error as e: pattern = None

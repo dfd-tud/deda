@@ -46,8 +46,8 @@ class PrintParser(object):
     pattern_handler._MatrixParserInterface
   """
   
-  def __init__(self, path, ydxArgs={}, verbose=False):
-    ydxArgs["path"] = path
+  def __init__(self, image, ydxArgs={}, verbose=False):
+    ydxArgs["image"] = image
     self._verbose = verbose
     self._ydxArgs = ydxArgs
     self.validMatrices = []

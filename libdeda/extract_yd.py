@@ -13,6 +13,7 @@ the Free Software Foundation, either version 3 of the License, or
 '''
 
 import sys, argparse, os, math, time, subprocess
+from io import BytesIO
 import numpy as np
 import cv2
 from scipy.signal import argrelextrema, argrelmin, argrelmax
@@ -120,14 +121,25 @@ class Common(PrintingClass):
 
 class CommonImageFunctions(Common):
     
-    def __init__(self, path, imDebugOutput=False, inputDpi=None):
+    def __init__(self, image, imDebugOutput=False, inputDpi=None):
         #super(CommonImageFunctions,self).__init__()
-        self.path = path
         self._imDebugOutput = imDebugOutput
-        self.imgDpi = inputDpi if inputDpi else self.getImgDpi(path)
+        self.path = None
+        if isinstance(image, bytes):
+            file_bytes = np.asarray(bytearray(image), dtype=np.uint8)
+            self.im = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        elif isinstance(image,np.ndarray):
+            self.im = image
+        else:
+            self.im = cv2.imread(image)
+            self.path = image
+        self.imgDpi = inputDpi if inputDpi else self.getImgDpi(image)
 
     def getImgDpi(self, im):
-        if not isinstance(im,np.ndarray):
+        if isinstance(im,np.ndarray):
+            shape = im.shape
+        else:
+            if isinstance(im,bytes): im = BytesIO(im)
             with Image.open(im) as pilimg:
                 try:
                     dpi = [float(n) for n in pilimg.info["dpi"]]
@@ -136,7 +148,6 @@ class CommonImageFunctions(Common):
                     dpi = np.average(dpi)
                     if dpi != 72: return dpi
                 shape = pilimg.size
-        else: shape = im.shape
         # assume DIN A4
         imgDpi = round(max(shape)/11.7,-2)
         sys.stderr.write("Error detecting input image DPI. "
@@ -146,7 +157,8 @@ class CommonImageFunctions(Common):
 
     def _imwrite(self, filename, im):
         if not self._imDebugOutput: return
-        orig = os.path.splitext(os.path.basename(self.path))[0]
+        orig = os.path.splitext(os.path.basename(self.path))[0] \
+            if self.path is not None else "?"
         out = "yd_%s_%s.png"%(orig,filename)
         self._print(0,"Writing %s"%out)
         cv2.imwrite(out,im)
@@ -582,12 +594,12 @@ class TooManyDotsException(Exception):
 class YellowDotsXposerBasic(
         RasterMixin,ImgProcessingMixin,RepetitionDetectorMixin):
 
-    def __init__(self, path, mask=None,
+    def __init__(self, image, mask=None,
             inputDpi=None, imDebugOutput=False,
             verbose=0, *args, **xargs):
         """
         Read scanned print.
-        @path: str or np.array, input image file
+        @image: binary, path or np.array, input image file
         @mask: str, path to inked mask or None for auto/none.
         @inputDpi: float, DPI of input image. None for auto detection
 
@@ -601,9 +613,9 @@ class YellowDotsXposerBasic(
         #))
         PrintingClass.__init__(self, verbose)
         CommonImageFunctions.__init__(
-            self,path,imDebugOutput=imDebugOutput,inputDpi=inputDpi)
+            self,image,imDebugOutput=imDebugOutput,inputDpi=inputDpi)
         self.inkedPath = inkedPath
-        im = path if isinstance(path,np.ndarray) else cv2.imread(path)
+        im = self.im
 
         self.hasDots = True
         if inputIsMask:
@@ -787,21 +799,20 @@ class YellowDotsXposerBasic(
         return matrix2str(self.matrix)
 
     def __repr__(self):
-        return "<YellowDotsXposer: path='%s', transCode=%s>"%(
-            self.path,str(self.transCode))
+        return "<YellowDotsXposer: transCode=%s>"%str(self.transCode)
 
 YDX = YellowDotsXposerBasic
 
 
 class YellowDotsXposer(YellowDotsXposerBasic):
 
-    def __init__(self, path, transCode=(None,None,None,None), 
+    def __init__(self, image, transCode=(None,None,None,None), 
             inputDpi=None, imDebugOutput=False, inputIsMask=False,
             onlyPrintRotation=False, noRotation=False, noCrop=False,
             onlyExpose=False, inkedPath=None, verbose=0, *args, **xargs):
         """
         Find yellow dot matrix by scanned print.
-        @path: str, input file
+        @image: binary, path or np.array, input image file
         @inputDpi: float, DPI of input image. None for auto detection
         @transCode: tuple (int matrix width, int matrix height,
             float dot distance X, float dot distance Y) in inches. 
@@ -828,8 +839,8 @@ class YellowDotsXposer(YellowDotsXposerBasic):
         xLen, yLen, distX, distY = transCode
         self.transCode = transCode
         super(YellowDotsXposer,self).__init__(
-            path,imDebugOutput=imDebugOutput or onlyExpose,inputDpi=inputDpi,
-            mask=inkedPath,verbose=verbose,*args,**xargs)
+            image,imDebugOutput=imDebugOutput or onlyExpose,
+            inputDpi=inputDpi,mask=inkedPath,verbose=verbose,*args,**xargs)
         if onlyExpose: return
         self.cleanDotPositions(rotation=not noRotation,crop=not noCrop)
         if None in [distX,distY]: distX,distY = self.getDotDistances()
