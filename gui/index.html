@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="stephan escher">
+
+    <title>Deda Toolkit</title>
+
+    <!-- CSS Import-->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/dedastyle.css" rel="stylesheet">
+    <link href="css/fontawesome-all.css" rel="stylesheet">
+    <!-- EEL -->
+    <script type='text/javascript' src='/eel.js'></script>
+
+</head>
+
+<body>
+    <div id="wrapper" class="toggled">
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper"></div>
+
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <div class="container-fluid">
+                <a href="#menu-toggle" id="menu-toggle"><i class="fas fa-ellipsis-h"></i></a><a class="language" href="de/index.html"> Deutsch </a>
+                <hr><h1>Deda Toolkit</h1><hr><br>
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Tracking Dot Extraction, Decoding and Anonymisation Toolkit</h5>
+                        <img class="logo" src="misc/logo.png"></img>
+                        <p>This toolkit enables the extraction and decoding of scanned print outs regarding possible embedded tracking dots.
+                        Futhermore it enables the anonymization of digitized print outs as well as the creation of an anonymization pattern for
+                        anonymized printing. Besides you can compare different sheets regarding their embedded tracking dots.<br>
+                        The tool is currently in beta-phase.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Ext-->
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+
+    <!-- Sidebar -->
+    <script type="text/javascript">
+        $("#menu-toggle").click(function(e) {
+            e.preventDefault();
+            $("#wrapper").toggleClass("toggled");
+        });
+
+        $(document).ready(function(){
+            $('#sidebar-wrapper').load('sidebar.html');
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="stephan escher">
+
+    <title>Deda Toolkit</title>
+
+    <!-- CSS Import-->
+    <link href="../css/bootstrap.min.css" rel="stylesheet">
+    <link href="../css/dedastyle.css" rel="stylesheet">
+    <link href="../css/fontawesome-all.css" rel="stylesheet">
+    <!-- EEL -->
+    <script type='text/javascript' src='/eel.js'></script>
+
+</head>
+
+<body>
+    <div id="wrapper" class="toggled">
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper"></div>
+
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <div class="container-fluid">
+                <a href="#menu-toggle" id="menu-toggle"><i class="fas fa-ellipsis-h"></i></a><a class="language" href="../comparison.html"> English</a>
+                <hr><h3> Vergleich von Ausdrucken <i class="fas fa-images"></i></h3><hr>
+                <br>
+                <div class="card">
+                    <div class="card-body">
+                        Hier können verschiedene Ausdrucke bezüglich ihrer integrierten Tracking Dots verglichen werden.
+                        Geben Sie hierfür verschiedene Datei- oder Ordnerpfade für den Vergleich von gescannten Ausdrucken ein und klicken Sie "Dokumente vergleichen".
+                        Bei Eingabe eines Ordnerpfades werden alle Bilddateien im Ordner nach Trackingdots analysiert.
+                        <a tabindex="0" role="button" data-toggle="popover" data-trigger="focus" data-html="true" title="Datei/Ordnerpfad kopieren"
+                        data-content="<u>Windows</u><ul><li>Shift+Rechtsklick auf Datei/Ordner</li><li>Pfad kopieren</li><li>Strg+v im Textfeld</ul></li>
+                        <u>Linux</u><ul><li>Strg+c auf Datei/Ordner</li><li>Strg+v im Textfeld</li></ul>"><i class="far fa-lightbulb"></i></i></a>
+                        <br><br>
+                        <form>
+                            <div class="form-group">
+                                <input id="file_selector" class="form-control" placeholder='Geben Sie einen einzelnen Datei- oder Ordnerpfad ein.'></input>
+                                <div id="input-container"></div>
+                            </div>
+                            <a href="javascript:void()" class="btn btn-secondary" onclick="add_fields()"><i class="fas fa-plus"></i> Datei-/Ordnereingabe hinzufügen</a>
+                            <a href="javascript:void()" class="btn btn-dark" data-dismiss="alert" onclick="pick_file()">Dokumente vergleichen</a>
+                            <i class="fas fa-spinner fa-pulse" id="loading" style="visibility:hidden;margin-left:10px;"></i>
+                        </form>
+                    </div>
+                </div>
+                <br>
+                <div class="alert alert-danger" id="file_info" role="alert" style="visibility:hidden;"></div>
+                <div class="alert alert-success" id="result_info" role="alert" style="visibility:hidden;"></div>
+                <h5 id="resultshead"></h5>
+                <br>
+                <span class='label label-info' id="result_compare"></span>
+                <br><br><br><br>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Ext-->
+    <script src="../js/jquery.min.js"></script>
+    <script src="../js/bootstrap.bundle.min.js"></script>
+
+    <!-- Misc -->
+    <script type="text/javascript">
+        $("#menu-toggle").click(function(e) {
+            e.preventDefault();
+            $("#wrapper").toggleClass("toggled");
+        });
+        $(document).ready(function(){
+            $('#sidebar-wrapper').load('sidebar.html');
+        });
+        $('[data-toggle="popover"]').popover({
+            trigger: 'focus'
+        });
+    </script>
+
+    <!-- add/delete input Fields -->
+    <script type='text/javascript'>
+        function add_fields(){
+
+            //CREATE FORM ROW
+            var container = document.getElementById('input-container');
+            var i = container.children.length;
+            var row = document.createElement('div');
+            row.className = 'form-row';
+            row.id = 'forminput'+i;
+            row.style['max-width'] = '550px';
+            container.appendChild(row);
+            var col1 = document.createElement('div');
+            var col2 = document.createElement('div');
+            col1.className = 'col-md-11';
+            col2.className = 'col-md-1';
+            row.append(col1);
+            row.append(col2);
+
+            // CREATE AND ADD INPUT FIELDS
+            var input = document.createElement('input');
+            input.id = 'file_selector' + i;
+            input.className = 'form-control';
+            input.style['font-size'] = '0.9rem';
+            input.style['margin-bottom'] = '3px';
+            input.placeholder = 'Zusätzlicher Datei- oder Ordnerpfad.';
+            col1.appendChild(input);
+            // CREATE AND ADD DELETE BUTTON
+            var del = document.createElement('a');
+            del.href= 'javascript:void()';
+            del.name = 'input_delete' + i;
+            del.className = 'btn btn-alert';
+            del.innerHTML = '<i class="far fa-trash-alt"></i>';
+            del.setAttribute('onclick', 'delField('+i+')');
+            col2.appendChild(del);
+        }
+        function delField(number){
+            var id = 'forminput' + number
+            var input = document.getElementById(id);
+            input.parentNode.removeChild(input);
+        }
+    </script>
+
+    <!-- Compare -->
+    <script type="text/javascript">
+        async function pick_file() {
+            //reset output
+            document.getElementById('loading').style["visibility"] = "";
+            document.getElementById('resultshead').innerHTML = '';
+            document.getElementById('result_compare').innerHTML = '';
+            let result_info = document.getElementById('result_info');
+            let file_info = document.getElementById('file_info');
+            result_info.style["visibility"]= "hidden";
+            file_info.style["visibility"] = "hidden";
+
+            //get all input files and folders
+            let files = [];
+            files.push(document.getElementById('file_selector').value);
+            var container = document.getElementById('input-container');
+            var size = container.children.length;
+            for(i=0; i<size;i++){
+                var id = 'file_selector'+i;
+                files.push(document.getElementById(id).value);
+            }
+
+            // send to Python
+            let info = await eel.compare(files)();
+            if(info != ''){
+                file_info.style["visibility"] = "";
+                file_info.innerHTML = info;
+            }
+            document.getElementById('loading').style["visibility"] = "hidden";
+        }
+        eel.expose(print_result);
+        function print_result(info, result_compare){
+            document.getElementById('resultshead').innerHTML = "Results";
+            let result_info = document.getElementById('result_info');
+            result_info.style["visibility"]= "";
+            result_info.innerHTML = info;
+            document.getElementById('result_compare').innerHTML = result_compare;
+        }
+    </script>
+
+</body>
+
+</html>
