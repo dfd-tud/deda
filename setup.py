@@ -13,10 +13,10 @@ setup(name='deda',
       author='Timo Richter',
       author_email='timo.juez@gmail.com',
       license='GNU General Public License v3 or later (GPLv3+)',
-      packages=['libdeda', 'deda_bin'],
+      packages=['libdeda', 'deda_bin', 'deda_gui'],
       install_requires=[
           'numpy', 'opencv-python', 'argparse', 'scipy', 'Pillow', 'PyPDF2', 
-          'reportlab',
+          'reportlab', 'eel'
       ],
       entry_points={'console_scripts': [
         'deda_anonmask_apply = deda_bin.deda_anonmask_apply:main',
@@ -25,8 +25,10 @@ setup(name='deda',
         'deda_compare_prints = deda_bin.deda_compare_prints:main',
         'deda_parse_print = deda_bin.deda_parse_print:main',
         'deda_extract_yd = libdeda.extract_yd:main',
+        'deda_gui = deda_gui.deda_gui:main',
       ]},
       include_package_data=True,
+      #package_data={'deda_gui':['web/*/*']},
       zip_safe=False,
       classifiers=(
         "Programming Language :: Python :: 3",

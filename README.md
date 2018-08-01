@@ -87,3 +87,8 @@ Set up your scan program so that it does not eliminate the paper structure nor t
 If there are really no tracking dots, you can print the calibration page (`deda_anonmask_create -w`) with another printer and use the mask for your own one. You can use the anonymised version of the tracking dots or just copy them (`deda_anonmask_create --copy`). See chapter "Anonymise a document for printing".
 
 
+##### Install Error: command 'x86_64-linux-gnu-gcc' failed with exit status 1
+
+This may be caused by the eel dependency which is needed for the GUI. Try
+`$ sudo apt-get install build-essential autoconf libtool pkg-config python3.6-dev gcc && pip3 install --user eel`
+
