@@ -421,6 +421,8 @@ class Pattern4(_AbstractMatrixParser):
   n_j = 32
   d_i = .04
   d_j = .04
+  n_i_prototype = 8
+  n_j_prototype = 16
   empty = [(x,y) for x in range(8,16) for y in range(0,17)]
   allowFlip=True
   #markers = [(x,6) for x in range(1,4)] #1,8
