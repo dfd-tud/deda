@@ -47,14 +47,7 @@ class _MatrixParserInterface(object):
         """
         pass
     
-    @classmethod
-    def applyCopies(self,m):
-        """
-        If @m contains a prototype and copies of it, update the copies
-        """
-        pass
-        
-    def crop(self,m): 
+    def crop(self,aligned): 
         """
         Format the matrix into a specific shape for check() and decode()
         Input: aligned matrix m
@@ -78,7 +71,7 @@ class _MatrixParserInterface(object):
         """
         pass
         
-    def createMask(self, m):
+    def createMask(self, aligned):
         """
         Returns anonymisation mask. United with @m it will contain
             ambiguous information.
@@ -87,7 +80,16 @@ class _MatrixParserInterface(object):
         """
         
 
-class _AbstractMatrixParser(_MatrixParserInterface):
+class _SetPatternId(type):
+
+    def __new__(cls, clsname, superclasses, attributedict):
+        c = type.__new__(cls, clsname, superclasses, attributedict)
+        c.pid = c.__int__()
+        return c
+        
+        
+class _AbstractMatrixParser(_MatrixParserInterface,
+                            metaclass=_SetPatternId):
 
     # Size
     n_i = -1
@@ -95,9 +97,20 @@ class _AbstractMatrixParser(_MatrixParserInterface):
     d_i = -1
     d_j = -1
     
+    empty=[] # list of coordinate tuples where matrix should not have dots
+    markers=[]
+    codebits=[]
+    allowFlip=False # analyse the horizontally flipped matrix as well
+    allowUpsideDown=True
+    allowRotation = True # If true, finds a pattern rotated by 90 degree
+    
     # When reading, do a majority decision for @minCount TDMs. At least this
     # amount of valid TDMs has to be detected for a certain pattern. -1=all
     minCount = 1
+
+    # List of (x,y) coordinates from where (0+i,0+j) shall be mapped to
+    # (x+i, y+j) for all i,j
+    repetitions = []
     
     # For offset patterns: Define distance between markers, default: n_i, n_j
     n_i_prototype = property(lambda self:self.n_i)
@@ -106,12 +119,25 @@ class _AbstractMatrixParser(_MatrixParserInterface):
     hps = property(lambda self:self.n_i*self.d_i)
     vps = property(lambda self:self.n_j*self.d_j)
     
-    def __int__(self):
-        return int(''.join(list(
-            filter(str.isdigit, self.__class__.__name__))))
+    def __init__(self, m=None):
+        dtype = np.uint8
+        shape = (self.n_i_prototype, self.n_j_prototype)
+        self.aligned = np.zeros(shape, dtype)
+        for x,y in self.markers: self.aligned[x,y] = 1
+        if m is not None:
+            for x,y in self.codebits: self.aligned[x,y] = m[x,y]
     
+    def __call__(self, *args, **xargs):
+        """ Create a new instance, object acts as class constructor """
+        return self.__class__(*args,**xargs)
+        
+    @classmethod
+    def __int__(self):
+        pid = ''.join(list(filter(str.isdigit, self.__name__)))
+        if len(pid) > 0: return int(pid)
+
     def __str__(self):
-        return "Pattern %d"%int(self)
+        return self.__class__.__name__.replace("Pattern","")
     
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -119,44 +145,36 @@ class _AbstractMatrixParser(_MatrixParserInterface):
     def checkAnyRolling(self,m):
         return True
 
-    def align(self, m, *args, **xargs):
-        transformations = self.getTransformations(m,*args,**xargs)
-        l = []
-        for d in transformations:
-            m = self.applyTransformation(m,d)
-            l.append(m)
-        return l
+    def getAlignedTDMs(self, m):
+        for t in self.getTransformations(m):
+            aligned = self.applyTransformation(m,t)
+            yield TDM(pattern=self(aligned), trans=t)
 
-    @classmethod
     def applyTransformation(self, m, d):
         if d.get("flip"): m=np.fliplr(m)
         if d.get("rot"): m=np.rot90(m,d["rot"])
         m = np.roll(m,(d["x"],d["y"]),(0,1))
-        return self.applyCopies(m)
+        m = m[0:self.n_i_prototype, 0:self.n_j_prototype]
+        return m
     
-    @staticmethod
-    def undoTransformation(m, d):
-        m = np.roll(m,(-d["x"],-d["y"]),(0,1))
+    def undoTransformation(self, aligned, d):
+        m = aligned
+        m2 = np.zeros((self.n_i, self.n_j),dtype=np.uint8)
+        for x in range(m.shape[0]):
+            for y in range(m.shape[1]):
+                for rx,ry in self.repetitions+[(0,0)]:
+                    m2[(rx+x)%self.n_i, (ry+y)%self.n_j] = m[x,y]
+        m = m2
+        #m = np.roll(m,(-d["x"],-d["y"]),(0,1))
         if d.get("rot"): m=np.rot90(m,4-d["rot"])
         if d.get("flip"): m=np.fliplr(m)
         return m
-    
-    @classmethod
-    def applyCopies(self, m):
-        return m
         
-    def getTransformations(self,m_,empty=[],nempty=[],strict=True,
-            allowFlip=False,allowUpsideDown=True,rot=0):
+    def getTransformations(self,m_):
         """
         Get geometrical transformations to move a matrix to a unique point
-        Note: If the dict self.alignment is present, then empty, nempty, 
-            allowFlip and rot are being read from there.
-        
         @m_ numpy matrix,
-        @empty list of coordinate tuples where m_ should not have dots,
-        @allowFlip bool: analyse the horizontally flipped matrix as well,
-        @rot int: matrix must be rotated at @rot degrees,
-        @returns the list of the transformations that fit best @nempty and 
+        @returns the list of the transformations that fit best @markers and 
                 @empty. Format:
             [dict(
                 x=int rolling_axis_0,
@@ -165,17 +183,17 @@ class _AbstractMatrixParser(_MatrixParserInterface):
                 flip=bool
             )]
         """
-        if strict == False: raise NotImplementedError("Set strict to True")
-        if isinstance(getattr(self,"alignment",None),dict):
-            empty = self.alignment.get("empty",empty)
-            nempty = self.alignment.get("nempty",nempty)
-            allowFlip = self.alignment.get("allowFlip",allowFlip)
-            allowUpsideDown = self.alignment.get("allowUpsideDown",allowUpsideDown)
-            rot = self.alignment.get("rot",rot)
         l = []
-        rotations = [rot,rot+2] if allowUpsideDown else [rot]
-        for rot_ in rotations:
-          for flip in set([False, allowFlip]):
+        rot = []
+        if self.allowRotation:
+            if self.n_i == m_.shape[0] and self.n_j == m_.shape[1]: rot+=[0]
+            if self.n_i == m_.shape[1] and self.n_j == m_.shape[0]: rot+=[1]
+        else: rot = [0]
+        if hasattr(self,"rot"): rot = self.rot
+
+        if self.allowUpsideDown: rot = [rud for r in rot for rud in [r,r+2]]
+        for rot_ in rot:
+          for flip in set([False, self.allowFlip]):
             m = m_.copy()
             if flip: m = np.fliplr(m)
             if rot_ != 0: m = np.rot90(m,rot_)
@@ -183,47 +201,43 @@ class _AbstractMatrixParser(_MatrixParserInterface):
             dd = [dict(x=-x,y=-y,rot=rot_,flip=flip)
                 for x in range(m.shape[0])
                 for y in range(m.shape[1])
-                if all([m[(dotx+x)%m.shape[0],(doty+y)%m.shape[1]] for dotx,doty in nempty]) and not any([m[(dotx+x)%m.shape[0],(doty+y)%m.shape[1]] for dotx,doty in empty])
+                if all([m[(dotx+x)%m.shape[0],(doty+y)%m.shape[1]] for dotx,doty in self.markers]) and not any([m[(dotx+x)%m.shape[0],(doty+y)%m.shape[1]] for dotx,doty in self.empty])
             ]
             l.extend(dd)
         return l
         
 
-class Pattern1(_AbstractMatrixParser):
+class _Pattern1(_AbstractMatrixParser):
   
+  s = None # Pattern specific s parameter
   n_i = 32
   n_j = 32
   d_i = .02
   d_j = .02
   n_i_prototype = 16
   n_j_prototype = 16
+  repetitions = [(16,16)]
+  allowRotation = False
   minCount = -1
-  alignments=[
-    dict(nempty=[(0,0),(1,0)],
-        empty=[(x,y) for x in range(0,16) for y in (2,4,6,8,10,12,14)]\
-            +[(x,y) for x in e2 for y in range(1,16)],
-        rot=rot, allowUpsideDown=False
-    )
-  for rot in [0,3]
-  for e2 in [(3,5,7,9,11,13,15),(0,2,4,6,8,10,12,14)]
-  ]
+  markers=[(0,0),(1,0)]
+  empty=None
+  allowUpsideDown=False #FIXME
+  rot=[0,3]
   
-  @classmethod
-  def applyCopies(self,aligned):
-    aligned[16:32,16:32] = aligned[0:16,0:16]
-    return aligned
+  C = property(lambda self: range(self.s,16,2))
+  R = range(1,16,2)
+  
+  @property
+  def codebits(self):
+    return [(c,r) for c in self.C for r in self.R]
   
   def checkAnyRolling(self,m):
     dots = np.sum(m,axis=0)
     return 2 in dots and sum([1 for s in dots if s%2==0]) >= 8
     #return 2 in dots and all([s%2==0 for s in dots])
 
-  def getTransformations(self,m,transposed=False,strict=True):
-    return [e for xargs in self.alignments 
-        for e in super(Pattern1,self).getTransformations(m,**xargs)]
-
   def crop(self,m):
-    C,R = self._findUsedCells(m)
+    return np.array([m[x,y] for x,y in self.codebits]).reshape(7,8)
     return np.array(m[C,:][:,R],dtype=np.uint8)
 
   def check(self,m):
@@ -241,28 +255,29 @@ class Pattern1(_AbstractMatrixParser):
     return dict(raw=decoded, serial="%s or %s"%(snr,snr2), 
         manufacturer="Ricoh/Lanier/Savin/NRG", printer=decoded)
 
-  def _findUsedCells(self, m):
-    """ Finds the index s of first used column (2 or 3) and returns the 
-    tuples R and C containing all row/column indexes """
-    C3 = (3,5,7,9,11,13,15)
-    C2 = (2,4,6,8,10,12,14)
-    R = (1,3,5,7,9,11,13,15)
-    #s=s2 if np.sum(m[s2,:]) > np.sum(m[s3,:]) else s3
-    if np.sum(m[C2,:]) > np.sum(m[C3,:]): return C2, R
-    else: return C3, R
-      
   def createMask(self,m, allOnes=False):
-    C,R = self._findUsedCells(m)
-    anon = np.zeros(m.shape)
+    anon = np.zeros(m.shape,dtype=np.uint8)
     if allOnes:
-        for c in C: anon[c,R] = 1
-    for r in R:
-        amountNewDots = 3 if np.sum(m[C,r]) == 0 else 1
-        C_empty = [c for c in C if m[c,r] == 0]
+        for x,y in self.codebits: anon[x,y] = 1
+    for r in self.R:
+        amountNewDots = 3 if np.sum(m[self.C,r]) == 0 else 1
+        C_empty = [c for c in self.C if m[c,r] == 0]
         C_fill = random.sample(C_empty,amountNewDots)
         anon[C_fill,r] = 1
-    return self.applyCopies(anon)
+    return anon
     
+
+class Pattern1s2(_Pattern1):
+    s = 2
+    empty=[(x,y) for x in range(0,16) for y in (2,4,6,8,10,12,14)]\
+                +[(x,y) for x in (3,5,7,9,11,13,15) for y in range(1,16)]
+
+
+class Pattern1s3(_Pattern1):
+    s = 3
+    empty=[(x,y) for x in range(0,16) for y in (2,4,6,8,10,12,14)]\
+                +[(x,y) for x in (0,2,4,6,8,10,12,14) for y in range(1,16)]
+        
 
 class Pattern2(_AbstractMatrixParser):
 
@@ -270,8 +285,9 @@ class Pattern2(_AbstractMatrixParser):
   n_j = 23
   d_i = .03
   d_j = .03
-  alignment = dict(empty=[(0,0),(2,1)],
-        nempty=[(1,1),(1,0),(0,1)],allowFlip=True)
+  empty=[(0,0),(2,1)]
+  markers=[(1,1),(1,0),(0,1)]
+  allowFlip=True
   manufacturers = {"3210": "Okidata", "3021": "HP", "2310": "Ricoh", 
         "0132": "Ricoh", "0213": "Lexmark", "0123": "Kyocera"}
   blocks = [[
@@ -279,6 +295,11 @@ class Pattern2(_AbstractMatrixParser):
             for row in range(5)]
         for y in range(4) for x in range(2)]
 
+  @property
+  def codebits(self):
+    a = np.array(np.array(self.blocks).flat)
+    return a.reshape((int(len(a)/2),2))
+    
   def crop(self,m):
     return np.array([[[m[x,y] for x,y in word] for word in words] 
         for words in self.blocks])
@@ -337,36 +358,28 @@ class Pattern2(_AbstractMatrixParser):
     return anon
     
 
-class Pattern21(Pattern2):
-
-  n_i = 23
-  n_j = 18
-  alignment = dict(empty=[(0,0),(2,1)],
-    nempty=[(1,1),(1,0),(0,1)],allowFlip=True,rot=1)
-
-
 class Pattern3(_AbstractMatrixParser):    
 
   n_i = 24
   n_j = 48
   d_i = .02
   d_j = .02
-  n_i_prototype = None
-  n_j_prototype = None
-  #alignment = dict(nempty = [(0,4+1),(0,1+1),(2,1+1)])
-  alignment = dict(nempty = [(0,4),(0,1),(2,1)])
+  n_i_prototype = 24
+  n_j_prototype = 16
+  #alignment = dict(markers = [(0,4+1),(0,1+1),(2,1+1)])
+  markers = [(0,4),(0,1),(2,1)]
   blocks = [[((bx*4+by+x)%24,(3*by+1+y)%16) for y in range(3) for x in range(2)]
         for by in range(5) for bx in range(6) if bx+by>=2]
+  repetitions = [(8,16),(16,32)]
   
+  @property
+  def codebits(self):
+    a = np.array(np.array(self.blocks).flat)
+    return a.reshape((len(a)/2,2))
+
   def checkAnyRolling(self, m):
     return 30 in [np.sum(m[:,0:16]),np.sum(m[:,16:32]),np.sum(m[:,32:48])]
 
-  @classmethod
-  def applyCopies(self, m):
-    m[:,16:32] = np.roll(m[:,0:16],8,0)
-    m[:,32:48] = np.roll(m[:,16:32],8,0)
-    return m
-    
   def crop(self,m):
     #m = m[:,1:16+1]
     m = m[:,0:16]
@@ -392,21 +405,14 @@ class Pattern3(_AbstractMatrixParser):
     for x,y in [y for x in self.blocks for y in x]:
         anon[x,y] = 1
     anon[m==1] = 0
-    return self.applyCopies(anon)
+    return anon
   
   def createMaskStrategic(self,m):
     anon = np.zeros(m.shape,dtype=np.uint8)
     for b in self.blocks:
         empty = [(x,y) for x,y in b if m[x,y]==0]
         anon[random.choice(empty)] = 1
-    return self.applyCopies(anon)
-
-
-class Pattern31(Pattern3):
-
-  n_i = 48
-  n_j = 24
-  alignment = dict(nempty = [(0,5),(0,2),(2,2)],rot=1)
+    return anon
 
 
 class Pattern4(_AbstractMatrixParser):
@@ -415,21 +421,19 @@ class Pattern4(_AbstractMatrixParser):
   n_j = 32
   d_i = .04
   d_j = .04
-  alignment=dict(empty = [(x,y) for x in range(8,16) for y in range(0,17)],
-    allowFlip=True) #nempty = [(x,6) for x in range(1,4)] #1,8
+  empty = [(x,y) for x in range(8,16) for y in range(0,17)]
+  allowFlip=True
+  #markers = [(x,6) for x in range(1,4)] #1,8
   manufacturers = {0:"Xerox", 3:"Epson", 20: "Dell", 4: "Xerox"}
-
+  codebits = [(x,y) for x in range(8) for y in range(1,16)]
+  repetitions = [(8,16)]
+    
   def checkAnyRolling(self,m):
     # max. two rows and cols with even amount of dots
     rows = np.sum(m,axis=0)
     cols = np.sum(m,axis=1)
     return len([1 for r in rows if r%2==1]) >= 14 \
         and len([1 for c in cols if c%2==1]) >= 7
-  
-  @classmethod
-  def applyCopies(self, m):
-    m[8:16,16:32] = m[0:8,0:16]
-    return m
   
   def crop(self,m):
     m = m[0:8,1:16]
@@ -476,18 +480,10 @@ class Pattern4(_AbstractMatrixParser):
         add = max(1, 4-int(np.sum(m[:,y])))
         anon[random.sample(empty,add),y] = 1
     anon[m==1] == 0
-    return self.applyCopies(anon)
+    return anon
 
 
-class Pattern41(Pattern4):
-
-  n_i = 32
-  n_j = 16
-  alignment=dict(empty = [(x,y) for x in range(8,16) for y in range(0,17)],
-    allowFlip=True,rot=1)
-
-
-patterns = {int(cls()):cls() 
+patterns = {cls.pid:cls()
     for name, cls in globals().items() 
     if name.startswith("Pattern")}
 
@@ -497,8 +493,7 @@ class TDM(object):
     An aligned Tracking Dots Matrix
     """
     
-    def __init__(self, pattern, trans, atX, atY, m=None, aligned=None, 
-            cropped=None):
+    def __init__(self, pattern, trans, atX=-1, atY=-1):
         """
         One of @m or @aligned is required. @aligned must be @m transformed
             according to @trans.
@@ -509,17 +504,13 @@ class TDM(object):
         atY int,
         m np.array untransformed matrix,
         aligned np.array transformed matrix,
-        cropped np.array cropped matrix of @aligned (optional).
         """
-        assert(m is not None or aligned is not None)
         self.pattern = pattern
+        self.aligned = pattern.aligned
+        self.trans = trans
         self.atX = atX
         self.atY = atY
-        self.trans = trans
-        self.aligned = self.pattern.applyTransformation(m,self.trans) if \
-            aligned is None else aligned
-        self.cropped = self.pattern.crop(self.aligned) if cropped is None \
-            else cropped
+        self.cropped = self.pattern.crop(self.aligned)
         
     def __getattr__(self, name):
         return getattr(self.pattern,name)(self.m)
@@ -534,14 +525,14 @@ class TDM(object):
         mask = self.pattern.createMask(self.aligned)
         if addTdm: mask = np.array((self.aligned+mask)>0,dtype=np.uint8)
         return TDM(
-            aligned=mask,atX=self.atX,atY=self.atY,
-            pattern=self.pattern,trans=self.trans)
+            atX=self.atX,atY=self.atY,
+            pattern=self.pattern(mask),trans=self.trans)
         
     def __str__(self):
         return matrix2str(self.aligned)
         
     def __repr__(self):
-        return "<TDM of Pattern %d at %d x %d pixels>"%(
+        return "<TDM of Pattern %s at %d x %d pixels>"%(
             self.pattern,self.atX,self.atY)
         
     def undoTransformation(self):

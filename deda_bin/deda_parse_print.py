@@ -47,7 +47,7 @@ class Main(object):
                 print("No tracking dot pattern detected. For best results "
                     "try a 300 dpi scan and a lossless file format.")
                 return
-        print("Detected pattern %d"%pp.pattern)
+        print("Detected pattern %s"%pp.pattern)
         if self.args.only_detect: return
 
         tdm = pp.tdm

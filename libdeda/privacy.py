@@ -258,11 +258,8 @@ class AnonmaskCreator(object):
         # create mask
         tdm = pp.tdm if copy else pp.tdm.createMask()
         #m = tdm.aligned
-        #m = tdm.undoTransformation()
+        m = tdm.undoTransformation()
         #m = np.roll(m,(pp.tdm.trans["x"],pp.tdm.trans["y"]),(0,1))
-        m = _AbstractMatrixParser.undoTransformation(tdm.aligned,dict(
-            x=0,y=0,rot=tdm.trans["rot"],flip=tdm.trans["flip"]
-        ))
         dots_proto = [((x*di), (y*dj))
             for x in range(m.shape[0]) for y in range(m.shape[1]) 
             if m[x,y] == 1]

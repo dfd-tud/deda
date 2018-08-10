@@ -104,9 +104,11 @@ class PrintParser(object):
         mm = self.yd.getAllMatrices(
             pattern.n_i, pattern.n_j, pattern.d_i, pattern.d_j
         )#,cutLength=(ni*di,nj*dj))
+        if pattern.allowRotation: mm += self.yd.getAllMatrices(
+            pattern.n_j, pattern.n_i, pattern.d_j, pattern.d_i)
         mm = [(meta,m) for meta,m in mm if .5 not in m and 1 in m]
         mmLists[pattern] = mm
-    self._print(" %s"%", ".join(["p%d: %d"
+    self._print(" %s"%", ".join(["p%s: %d"
         %(p,len(mm)) for p,mm in mmLists.items()]))
     self._print("\n")
 
@@ -122,9 +124,9 @@ class PrintParser(object):
             validMatrices[p] = validMatrices.get(p,[])+[tdm]
             candidates[p] = candidates.get(p,0)+1
         ci = sorted(candidates.items(),
-            key=lambda e:e[1]*10+int(e[0]),reverse=True)
+            key=lambda e:e[1]*10+int(e[0].pid),reverse=True)
         self._print(("\rTesting matrix #%d. "%i)+
-            ", ".join(["p%d: %d"%(p,amount) for p,amount in ci]))
+            ", ".join(["p%s: %d"%(p,amount) for p,amount in ci]))
         for p in patterns.values():
             if p.minCount>0 and candidates.get(p,-1) >= p.minCount:
                 self._print("\n")
@@ -165,9 +167,9 @@ class PrintParser(object):
         x = cropx+gridx+cellx
         y = cropy+gridy+celly
         x_,y_=self._get_dxy(x,y,p)
-        for t in p.getTransformations(m):
-            tdm = TDM(pattern=p,m=m,trans=t,
-                atX=x+x_,atY=y+y_)
+        for tdm in p.getAlignedTDMs(m):
+            tdm.atX = x+x_
+            tdm.atY = y+y_
             tdm.meta_position = meta+(x_,y_)
             yield tdm
             #[tdm for t in p.getTransformations(m) 
