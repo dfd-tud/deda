@@ -106,7 +106,12 @@ class AnonmaskCreator(object):
         self._magentaMarkers = self._getMagentaMarkers()
         self.getPageScaling()
         self.restorePerspective()
-        maskdata = self.createMask(*args, **xargs)
+        tdm, xOffset, yOffset = self.readTDM()
+        dots_proto = self.tdm2mask(tdm, *args, **xargs)
+        maskdata = dict(
+            proto=dots_proto, hps=tdm.hps, vps=tdm.vps, x_offset=xOffset,
+            y_offset=yOffset, pagesize=CALIBRATIONPAGE_SIZE, 
+            scale=self.scaling, format_ver=MASK_VERSION)
         return json.dumps(maskdata).encode("ascii")
         
     @property
@@ -208,9 +213,10 @@ class AnonmaskCreator(object):
             flags=cv2.INTER_NEAREST+cv2.WARP_FILL_OUTLIERS)
         self.dpi *= self.scaling
         
-    def createMask(self, copy):
-        """
-        Create a mask prototype
+    def readTDM(self):
+        """ 
+        Extract TDM from scan 
+        @returns: TDM, xOffset, yOffset
         """
         print("Extracting tracking dots... ")
         #cv2.imwrite("perspective.png",self.im)
@@ -237,35 +243,10 @@ class AnonmaskCreator(object):
         
         print("\tTracking dots pattern found:")
         print("\tx=%d, y=%d, trans=%s"%(pp.tdm.atX,pp.tdm.atY,pp.tdm.trans))
+
         di = pp.pattern.d_i
         dj = pp.pattern.d_j
-        hps = pp.pattern.hps
-        vps = pp.pattern.vps
-        #di = self.scaling*di
-        #dj = self.scaling*dj
-        #tdm = pp.tdm
-        #tdms = sorted(tdms,key=lambda e:e.atY+e.atX)
-        """
-        dots_references = [(x*di+tdm.atX/pp.yd.imgDpi, y*dj+tdm.atY/pp.yd.imgDpi)
-            for tdm in tdms
-            for m in [tdm.undoTransformation()]
-            for x in range(m.shape[0]) for y in range(m.shape[1])
-            if m[x,y] == 1]
-        im = np.zeros(self.im.shape)
-        for x,y in dots_references:
-            im[int(y*self.dpi),int(x*self.dpi)] = 255
-        cv2.imwrite("perspective_layer.png", im)
-        """
-        
-        # create mask
-        tdm = pp.tdm if copy else pp.tdm.createMask()
-        #m = tdm.aligned
-        m = tdm.undoTransformation()
-        #m = np.roll(m,(pp.tdm.trans["x"],pp.tdm.trans["y"]),(0,1))
-        dots_proto = [((x*di), (y*dj))
-            for x in range(m.shape[0]) for y in range(m.shape[1]) 
-            if m[x,y] == 1]
-        
+
         # set correct hps,vps for offset patterns
         hps2 = di*pp.pattern.n_i_prototype
         vps2 = dj*pp.pattern.n_j_prototype
@@ -300,43 +281,68 @@ class AnonmaskCreator(object):
         if pp.tdm.trans["rot"]%2 == 1:
             xOffset, yOffset = yOffset, xOffset
         print("TDM offset: %f, %f"%(xOffset,yOffset))
+        
+        return pp.tdm, xOffset, yOffset
 
-        return dict(proto=dots_proto, hps=hps, vps=vps, x_offset=xOffset,
-            y_offset=yOffset, pagesize=CALIBRATIONPAGE_SIZE, 
-            scale=self.scaling, format_ver=MASK_VERSION)
+    @classmethod
+    def tdm2mask(self, tdm, copy):
+        """
+        Create a mask prototype
+        """
+        pattern = tdm
+        di = pattern.d_i
+        dj = pattern.d_j
+        #di = self.scaling*di
+        #dj = self.scaling*dj
+        #tdm = tdm
+        #tdms = sorted(tdms,key=lambda e:e.atY+e.atX)
+        """
+        dots_references = [(x*di+tdm.atX/pp.yd.imgDpi, y*dj+tdm.atY/pp.yd.imgDpi)
+            for tdm in tdms
+            for m in [tdm.undoTransformation()]
+            for x in range(m.shape[0]) for y in range(m.shape[1])
+            if m[x,y] == 1]
+        im = np.zeros(self.im.shape)
+        for x,y in dots_references:
+            im[int(y*self.dpi),int(x*self.dpi)] = 255
+        cv2.imwrite("perspective_layer.png", im)
+        """
+        
+        # create mask
+        tdm = tdm if copy else tdm.createMask()
+        #m = tdm.aligned
+        m = tdm.undoTransformation()
+        #m = np.roll(m,(tdm.trans["x"],tdm.trans["y"]),(0,1))
+        dots_proto = [((x*di), (y*dj))
+            for x in range(m.shape[0]) for y in range(m.shape[1]) 
+            if m[x,y] == 1]
+        return dots_proto
         
 
 def calibrationScan2Anonmask(imbin, copy=False):
     return AnonmaskCreator(imbin)(copy)
     
 
-class AnonmaskApplier(object):
+class AnonmaskApplierClass(object):
     """
     Apply the anonymisation mask created by AnonmaskCreator to a page for 
     printing
     """
     colour = YELLOW
-    dotRadius = 0.004 #in
+    pagesize = CALIBRATIONPAGE_SIZE
 
-    def __init__(self, mask, dotRadius=None, xoffset=None, 
-                yoffset=None, debug=False, scale=None):
-        d = json.loads(mask)
-        if d.get("format_ver",0) < MASK_VERSION:
-            raise Exception("Incompatible format version by mask. "
-                "Please generate AND print a new calibration page (see "
-                "deda_anonmask_create).")
-        proto = d["proto"]
-        self.scale = scale or d.get("scale",1)
-        self.hps = d["hps"]
-        self.vps = d["vps"]
-        self.xOffset = xoffset or d["x_offset"]
-        self.yOffset = yoffset or d["y_offset"]
+    def __init__(self, proto, hps, vps, dotRadius=0.004, xoffset=0, 
+                yoffset=0, debug=False, scale=1):
+        self.hps = hps
+        self.vps = vps
+        self.xOffset = xoffset
+        self.yOffset = yoffset
+        self.scale = scale
         
         self.proto = [
             ((xDot+self.xOffset)%self.hps, (yDot+self.yOffset)%self.vps)
             for xDot, yDot in proto]
-        self.pagesize = d["pagesize"]
-        if dotRadius: self.dotRadius = dotRadius
+        self.dotRadius = dotRadius
         if debug: self.colour = MAGENTA
 
     def apply(self, inPdf):
@@ -366,7 +372,7 @@ class AnonmaskApplier(object):
                     if x*72 > w or y*72 > h: continue
                     allDots.append((x,y))
 
-        if "wand" in globals():
+        if "wand" in globals() and page != None:
             # PyPDF2 page to cv2 image
             dpi = 300
             pageio = BytesIO()
@@ -388,6 +394,7 @@ class AnonmaskApplier(object):
             c.circle(x*72,h-y*72,self.dotRadius*72,stroke=0,fill=1)
         c.showPage()
         c.save()
+        io.seek(0)
         return io
     
     @staticmethod
@@ -446,6 +453,26 @@ class AnonmaskApplier(object):
         output.write(outIO)
         outIO.seek(0)
         return outIO.read()
+
+
+class AnonmaskApplierJson(AnonmaskApplierClass):
+
+    def __init__(self, mask, **xargs):
+        d = json.loads(mask)
+        if d.get("format_ver",0) < MASK_VERSION:
+            raise Exception("Incompatible format version by mask. "
+                "Please generate AND print a new calibration page (see "
+                "deda_anonmask_create).")
+        self.pagesize = d["pagesize"]
+        super(AnonmaskApplierJson,self).__init__(
+            d["proto"], d["hps"], d["vps"],
+            xOffset = xargs.pop("xoffset",None) or d["x_offset"],
+            yOffset = xargs.pop("yoffset",None) or d["y_offset"],
+            scale = xargs.pop("scale",None) or d["scale"],
+            **xargs)
+
+
+AnonmaskApplier = AnonmaskApplierJson
 
 
 class ScanCleaner(ImgProcessingMixin):
