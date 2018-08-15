@@ -24,6 +24,7 @@ import libdeda.pypdf2patch
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib import pagesizes
+from reportlab.pdfbase import pdfdoc 
 from colorsys import rgb_to_hsv
 from libdeda.print_parser import PrintParser
 from libdeda.extract_yd import rotateImage, matrix2str, ImgProcessingMixin
@@ -42,7 +43,7 @@ CALIBRATION_MARKERS = [(x,y)
     for x in [0+EDGE_MARGIN, CALIBRATIONPAGE_SIZE[0]/72-EDGE_MARGIN]
     for y in [0+EDGE_MARGIN, CALIBRATIONPAGE_SIZE[1]/72-EDGE_MARGIN]]
 
-    
+
 def createCalibrationpage():
     """
     Create the calibration page according to the global parameters and return
@@ -183,13 +184,15 @@ class AnonmaskCreator(object):
         distsReal = [dist(a,b) for a,b in combinations(CALIBRATION_MARKERS,2)
             ]
         dists = [a/b for a,b in zip(distsReal,distsScan)]
-        self.scaling = np.max(dists)
-        if abs(1-self.scaling) > 0.01: sys.stderr.write(
-            "WARNING: Your print has probably been resized. For better "    
-            "results disable \"fit to page\".\n")
-        #self.scaling = 1.041
-        print("Scaling factor: %f theoretical inches = 1 inch on paper"
-            %self.scaling)
+        #self.scaling = np.max(dists)
+        self.scaling = np.percentile(dists,80)
+        if abs(1-self.scaling) < 0.008: self.scaling = 1
+        else: 
+            sys.stderr.write(
+                "WARNING: Your print has probably been resized. For "    
+                "better results disable page scaling.\n")
+            print("Scaling factor: %f theoretical inches = 1 inch on paper"
+                %self.scaling)
             
     def restorePerspective(self):
         inputPoints = self._magentaMarkers
