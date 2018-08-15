@@ -101,11 +101,7 @@ class PrintParser(object):
     mmLists = {}
     for pattern in patterns.values():
         self._print(".")
-        mm = self.yd.getAllMatrices(
-            pattern.n_i, pattern.n_j, pattern.d_i, pattern.d_j
-        )#,cutLength=(ni*di,nj*dj))
-        if pattern.allowRotation: mm += self.yd.getAllMatrices(
-            pattern.n_j, pattern.n_i, pattern.d_j, pattern.d_i)
+        mm = pattern.getAllMatricesFromYDX(self.yd)
         mm = [(meta,m) for meta,m in mm if .5 not in m and 1 in m]
         mmLists[pattern] = mm
     self._print(" %s"%", ".join(["p%s: %d"

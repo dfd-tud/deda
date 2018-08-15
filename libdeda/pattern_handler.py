@@ -7,7 +7,9 @@ Example:
     from extract_yd import YDX
     from pattern_handler import TDM, patterns
     
-    for m in YDX("input.jpg").matrices:
+    matrices = YDX("input.jpg").getAllMatrices(
+        patterns[2].n_i,patterns[2].n_j,patterns[2].d_i,patterns[2].d_j)
+    for m in matrices:
         transformations = patterns[2].getTransformations(m)
         for t in transformations:
             tdm = TDM(m=m, pattern=patterns[2], trans=t)
@@ -37,7 +39,7 @@ class _MatrixParserInterface(object):
     Interface
     """
     
-    def checkAnyRolling(self,m):
+    def checkUnaligned(self,unaligned):
         """
         Optional function for performance reasons
         Do quick verification on original matrix that has been rotated and
@@ -46,27 +48,19 @@ class _MatrixParserInterface(object):
         Output: bool
         """
         pass
-    
-    def crop(self,aligned): 
+
+    def check(self,aligned): 
         """
-        Format the matrix into a specific shape for check() and decode()
-        Input: aligned matrix m
-        Output: matrix m'
-        """
-        pass
-        
-    def check(self,m): 
-        """
-        Verify a matrix' validity
-        Input: cropped matrix m
+        Verify a matrix' validity and do redundance checks
+        Input: aligned matrix
         Output: bool
         """
         pass
     
-    def decode(self,m):
+    def decode(self,aligned):
         """
         Transform a matrix to human readable information
-        Input: cropped matrix m
+        Input: aligned matrix
         Output: dict
         """
         pass
@@ -75,7 +69,7 @@ class _MatrixParserInterface(object):
         """
         Returns anonymisation mask. United with @m it will contain
             ambiguous information.
-        Input: aligned matrix m
+        Input: aligned matrix
         Output: matrix of same shape as m
         """
         
@@ -142,22 +136,34 @@ class _AbstractMatrixParser(_MatrixParserInterface,
     def __hash__(self):
         return hash(self.__class__.__name__)
     
-    def checkAnyRolling(self,m):
+    def checkUnaligned(self,unaligned):
         return True
 
-    def getAlignedTDMs(self, m):
-        for t in self.getTransformations(m):
-            aligned = self.applyTransformation(m,t)
+    @classmethod
+    def getAllMatricesFromYDX(pattern, ydx):
+        mm = ydx.getAllMatrices(
+            pattern.n_i, pattern.n_j, pattern.d_i, pattern.d_j
+        )#,cutLength=(ni*di,nj*dj))
+        if pattern.allowRotation: mm += ydx.getAllMatrices(
+            pattern.n_j, pattern.n_i, pattern.d_j, pattern.d_i)
+        return mm
+
+    def getAlignedTDMs(self, unaligned):
+        for t in self.getTransformations(unaligned):
+            aligned = self.applyTransformation(unaligned,t)
             yield TDM(pattern=self(aligned), trans=t)
 
-    def applyTransformation(self, m, d):
-        if d.get("flip"): m=np.fliplr(m)
-        if d.get("rot"): m=np.rot90(m,d["rot"])
-        m = np.roll(m,(d["x"],d["y"]),(0,1))
+    def applyTransformation(self, unaligned, t):
+        """ Align matrix @unaligned according to transformation @t """
+        m = unaligned
+        if t.get("flip"): m=np.fliplr(m)
+        if t.get("rot"): m=np.rot90(m,t["rot"])
+        m = np.roll(m,(t["x"],t["y"]),(0,1))
         m = m[0:self.n_i_prototype, 0:self.n_j_prototype]
         return m
     
-    def undoTransformation(self, aligned, d):
+    def undoTransformation(self, aligned, t):
+        """ Unalign matrix @aligned according to transformation @t """
         m = aligned
         m2 = np.zeros((self.n_i, self.n_j),dtype=np.uint8)
         for x in range(m.shape[0]):
@@ -166,14 +172,14 @@ class _AbstractMatrixParser(_MatrixParserInterface,
                     m2[(rx+x)%self.n_i, (ry+y)%self.n_j] = m[x,y]
         m = m2
         #m = np.roll(m,(-d["x"],-d["y"]),(0,1))
-        if d.get("rot"): m=np.rot90(m,4-d["rot"])
-        if d.get("flip"): m=np.fliplr(m)
+        if t.get("rot"): m=np.rot90(m,4-t["rot"])
+        if t.get("flip"): m=np.fliplr(m)
         return m
         
-    def getTransformations(self,m_):
+    def getTransformations(self,unaligned):
         """
-        Get geometrical transformations to move a matrix to a unique point
-        @m_ numpy matrix,
+        Get list of possible geometrical transformations to align a matrix
+        @unaligned numpy matrix,
         @returns the list of the transformations that fit best @markers and 
                 @empty. Format:
             [dict(
@@ -186,18 +192,22 @@ class _AbstractMatrixParser(_MatrixParserInterface,
         l = []
         rot = []
         if self.allowRotation:
-            if self.n_i == m_.shape[0] and self.n_j == m_.shape[1]: rot+=[0]
-            if self.n_i == m_.shape[1] and self.n_j == m_.shape[0]: rot+=[1]
+            if self.n_i == unaligned.shape[0] \
+            and self.n_j == unaligned.shape[1]:
+                rot+=[0]
+            if self.n_i == unaligned.shape[1] \
+            and self.n_j == unaligned.shape[0]:
+                rot+=[1]
         else: rot = [0]
         if hasattr(self,"rot"): rot = self.rot
 
         if self.allowUpsideDown: rot = [rud for r in rot for rud in [r,r+2]]
         for rot_ in rot:
           for flip in set([False, self.allowFlip]):
-            m = m_.copy()
+            m = unaligned.copy()
             if flip: m = np.fliplr(m)
             if rot_ != 0: m = np.rot90(m,rot_)
-            if not self.checkAnyRolling(m): continue
+            if not self.checkUnaligned(m): continue
             dd = [dict(x=-x,y=-y,rot=rot_,flip=flip)
                 for x in range(m.shape[0])
                 for y in range(m.shape[1])
@@ -231,20 +241,18 @@ class _Pattern1(_AbstractMatrixParser):
   def codebits(self):
     return [(c,r) for c in self.C for r in self.R]
   
-  def checkAnyRolling(self,m):
+  def checkUnaligned(self,m):
     dots = np.sum(m,axis=0)
     return 2 in dots and sum([1 for s in dots if s%2==0]) >= 8
     #return 2 in dots and all([s%2==0 for s in dots])
 
-  def crop(self,m):
-    return np.array([m[x,y] for x,y in self.codebits]).reshape(7,8)
-    return np.array(m[C,:][:,R],dtype=np.uint8)
-
-  def check(self,m):
+  def check(self,aligned):
+    m = np.array([aligned[x,y] for x,y in self.codebits]).reshape(7,8)
     sums = np.sum(m,axis=0)
     return np.sum(m)>3 and all([bool(1-int(s%2)) for s in sums])
     
-  def decode(self,m):
+  def decode(self,aligned):
+    m = np.array([aligned[x,y] for x,y in self.codebits]).reshape(7,8)
     info = list(reversed(m[1:,:].T.flatten()))
     words = list(map(''.join,zip(*[iter(map(str,info))]*4)))
     decoded = "".join([str(int(b,2)) for b in words])
@@ -300,11 +308,9 @@ class Pattern2(_AbstractMatrixParser):
     a = np.array(np.array(self.blocks).flat)
     return a.reshape((int(len(a)/2),2))
     
-  def crop(self,m):
-    return np.array([[[m[x,y] for x,y in word] for word in words] 
+  def check(self,aligned):
+    m = np.array([[[aligned[x,y] for x,y in word] for word in words] 
         for words in self.blocks])
-
-  def check(self,m):
     return ( 
         # one hot encoding check
         all([(np.sum(words[0:4], axis=1)==1).all() for words in m])
@@ -312,7 +318,9 @@ class Pattern2(_AbstractMatrixParser):
         and all([(np.sum(words,axis=0)%2==1).all() for words in m]) 
     )
     
-  def decode(self,m):
+  def decode(self,aligned):
+    m = np.array([[[aligned[x,y] for x,y in word] for word in words] 
+        for words in self.blocks])
     trans = {'0001':0, '0010':1, '0100':2, '1000':3}
     blocks = ["".join([str(trans[array2str(w)]) for w in words[0:4]]) 
         for words in m]
@@ -341,7 +349,7 @@ class Pattern2(_AbstractMatrixParser):
     # blocks A and B
     anon[1:18,2:7] = 0
     trans = {str(v):k for k,v in {'0001':0, '0010':1, '0100':2, '1000':3}.items()}
-    manuStr = self.decode(self.crop(m))["manufacturer"]
+    manuStr = self.decode(m)["manufacturer"]
     otherManufacturers = [k for k,s in self.manufacturers.items() 
         if s!=manuStr]
     manu2 = random.choice(otherManufacturers)
@@ -377,20 +385,19 @@ class Pattern3(_AbstractMatrixParser):
     a = np.array(np.array(self.blocks).flat)
     return a.reshape((len(a)/2,2))
 
-  def checkAnyRolling(self, m):
+  def checkUnaligned(self, m):
     return 30 in [np.sum(m[:,0:16]),np.sum(m[:,16:32]),np.sum(m[:,32:48])]
 
-  def crop(self,m):
-    #m = m[:,1:16+1]
-    m = m[:,0:16]
-    if np.sum(m) != 30: return None
+  def check(self,aligned):
+    m = aligned[:,0:16]
+    if np.sum(m) != 30: return False
     m = np.array([[m[x,y] for x,y in b] for b in self.blocks])
-    return m
-
-  def check(self,m):
     return all([np.sum(block)==1 for block in m])
     
-  def decode(self,m):
+  def decode(self,aligned):
+    m = aligned[:,0:16]
+    m = np.array([[m[x,y] for x,y in b] for b in self.blocks])
+    
     trans = {'000001':0, '000010':1, '000100':2, '001000':3, '010000':4,
         '100000':5}
     blocks = [str(trans[array2str(block)]) for block in m]
@@ -430,25 +437,23 @@ class Pattern4(_AbstractMatrixParser):
   codebits = [(x,y) for x in range(8) for y in range(1,16)]
   repetitions = [(8,16)]
     
-  def checkAnyRolling(self,m):
+  def checkUnaligned(self,m):
     # max. two rows and cols with even amount of dots
     rows = np.sum(m,axis=0)
     cols = np.sum(m,axis=1)
     return len([1 for r in rows if r%2==1]) >= 14 \
         and len([1 for c in cols if c%2==1]) >= 7
-  
-  def crop(self,m):
-    m = m[0:8,1:16]
-    return m
-    
-  def check(self,m):
+
+  def check(self,aligned):
+    m = aligned[0:8,1:16]
     r = (all([bool(int(s%2)) for s in np.sum(m[:,:14],axis=0)])
         and all([bool(int(s%2)) for s in np.sum(m[1:,:],axis=1)])
         and np.sum(m[1:4,8])==0 and np.sum(m[1:3,9:11])==0
     )
     return bool(r)
   
-  def decode(self,m):
+  def decode(self,aligned):
+    m = aligned[0:8,1:16]
     m = np.rot90(m) # same shape as EFF
     format = dict(
         minutes=1, hour=4, day=5, month=6, year=7, serial=(12,11,10),
@@ -512,16 +517,15 @@ class TDM(object):
         self.trans = trans
         self.atX = atX
         self.atY = atY
-        self.cropped = self.pattern.crop(self.aligned)
         
     def __getattr__(self, name):
         return getattr(self.pattern,name)(self.m)
         
     def decode(self):
-        return self.pattern.decode(self.cropped)
+        return self.pattern.decode(self.aligned)
         
     def check(self):
-        return self.cropped is not None and self.pattern.check(self.cropped)
+        return self.pattern.check(self.aligned)
         
     def createMask(self, addTdm=True):
         mask = self.pattern.createMask(self.aligned)
@@ -541,8 +545,7 @@ class TDM(object):
         return self.pattern.undoTransformation(self.aligned,self.trans)
         
     def __hash__(self):
-        if self.cropped is None: return hash(None)
-        return hash("".join([str(int(x)) for x in self.cropped.flat]))
+        return hash("".join([str(int(x)) for x in self.aligned.flat]))
         
     def __eq__(self, o):
         return hash(self) == hash(o)
