@@ -29,7 +29,6 @@ from colorsys import rgb_to_hsv
 from libdeda.print_parser import PrintParser
 from libdeda.extract_yd import rotateImage, matrix2str, ImgProcessingMixin
 from libdeda.cmyk_to_rgb import CYAN, MAGENTA, BLACK, YELLOW
-from libdeda.pattern_handler import _AbstractMatrixParser
 
 
 MASK_VERSION = 3
