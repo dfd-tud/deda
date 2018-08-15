@@ -211,7 +211,7 @@ class _AbstractPattern(_PatternInstantiationMixin, _PatternInterface,
     vps = property(lambda self:self.n_j*self.d_j)
     
     def __init__(self, m=None, trans=None):
-        self.trans = trans
+        self.trans = trans or {}
         dtype = np.uint8
         shape = (self.n_i_prototype, self.n_j_prototype)
         self.aligned = np.zeros(shape, dtype)
@@ -503,24 +503,25 @@ class Pattern4(_AbstractPattern):
     value = str(value)
     if name == "serial": value = value.replace("-","")
     if name == "manufacturer" and not value.isdigit():
-        manufacturersRev = {v:k for k,v in manufacturers.items()}
+        manufacturersRev = {v:k for k,v in self.manufacturers.items()}
         if value not in manufacturersRev: 
             raise KeyError("'%s' is not a valid manufacturer."%value)
-        value = manufacturersRev[value]
+        value = str(manufacturersRev[value])
     assert(value.isdigit())
     rows = self.format[name]
     if not isinstance(rows,tuple): rows = (rows,)
-    if len(value)%2 != 0: value = "0%s"%value
-    assert(len(value)/2 == len(rows))
+    assert(len(value) <= len(rows)*2)
+    value = ("%%0%dd"%(len(rows)*2))%int(value)
     for i in range(len(rows)):
-        v = value[i:i+2]
+        v = value[i*2:i*2+2]
         row = rows[i]
         valbin = list(map(int, bin(int(v))[2:]))
         while len(valbin) < 8: valbin = [0]+valbin # fill 
-        valbin[0] = 1-np.sum(valbin)%2 # parity
+        #valbin[0] = 1-np.sum(valbin)%2 # parity
         self.aligned[:,row] = valbin
-    self.aligned[:,15] = 1-np.sum(self.aligned[:,1:15],axis=1)%2 # parity
-    self.aligned[0,15] = 1-np.sum(self.aligned[1:8,15])%2
+    self.aligned[:,15] = 1-np.sum(self.aligned[:,1:15],axis=1)%2 # v parity
+    self.aligned[0,1:] = 1-np.sum(self.aligned[1:8,1:],axis=0)%2 # h parity
+    #self.aligned[0,15] = 1-np.sum(self.aligned[1:8,15])%2
     
   def decode(self,aligned):
     d = {k:self[k] for k in self.format.keys()}
@@ -587,7 +588,13 @@ class TDM(object):
         
     def __str__(self):
         return matrix2str(self.aligned)
+    
+    def __hash__(self):
+        return hash(self.pattern)
         
+    def __eq__(self, o):
+        return hash(self) == hash(o)
+    
     def __repr__(self):
         return "<TDM of Pattern %s at %d x %d pixels>"%(
             self.pattern,self.atX,self.atY)

@@ -104,7 +104,7 @@ class PrintParser(object):
     self._print("\n")
 
     patternScore = {p:0 for p in patterns.values()} #patternId -> score
-    patternScoreSorted = patternScore.items() # will stay sorted
+    patternScoreSorted = list(patternScore.items()) # will stay sorted
     validMatrices = {p:[] for p in patterns.values()} #patternId -> mList
     i = 0
     while len(tdmIterators) > 0:
@@ -117,7 +117,7 @@ class PrintParser(object):
         if tdm.check() == False: continue
         validMatrices[p] += [tdm]
         patternScore[p] += 1
-        patternScoreSorted = sorted(patternScore.items(),
+        patternScoreSorted = sorted(list(patternScore.items()),
             key=lambda e:e[1]*10+int(e[0].pid),reverse=True)
         self._print(", ".join(["p%s: %d"%(p,amount) 
                        for p,amount in patternScoreSorted]))
@@ -129,7 +129,7 @@ class PrintParser(object):
             self.pattern = p
             return p
     self._print("\n")
-    if len(patternScoreSorted)>0 and patternScoreSorted[0][0].minCount == -1:
+    if patternScoreSorted[0][1]>0 and patternScoreSorted[0][0].minCount==-1:
         p = patternScoreSorted[0][0]
         self.validMatrices = validMatrices[p]
         self.allTDMs = tdmIteratorsFresh[p]
