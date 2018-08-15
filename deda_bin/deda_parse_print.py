@@ -58,8 +58,13 @@ class Main(object):
         #print(matrix2str(masked))
         #print(mask)
         print(repr(tdm))
-        print(tdm.trans)
-        print("Decoded: %s"%str(tdm.decode()))
+        print("Decoded:")
+        decoded = tdm.decode()
+        for key in ["manufacturer", "serial", "timestamp", "raw"
+                ]+list(decoded.keys()):
+            if key not in decoded: continue
+            print("\t%s: %s"%(key, decoded.pop(key)))
+        #print("Decoded: %s"%str(tdm.decode()))
         """
         print("Anonymised: \n\tSucceeds redundance check: %s"
             %str(tdm.check()))
