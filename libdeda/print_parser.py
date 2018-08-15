@@ -18,12 +18,12 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 """
 
-import os, sys, random, math
+import os, sys, random, math, itertools
 import numpy as np
 from libdeda.extract_yd import YDX, TooManyDotsException, matrix2str, \
     YELLOW_STRICT, YELLOW2, YELLOW_STRICTHUE, YELLOW_GREEDY, \
     YELLOW_STRICTHUE_GREEDYSAT, YELLOW_PURE
-from libdeda.pattern_handler import patterns, TDM
+from libdeda.pattern_handler import patterns
 
 
 class YD_Parsing_Error(Exception): 
@@ -95,58 +95,56 @@ class PrintParser(object):
   
   def _calcPattern(self):
     """ Returns the automatically detected pattern id """
+    # interpretation of a sheet under any of the patterns
     self._print("Getting candidates")
-
-    # make mmList: interpretation of a sheet under any pattern
-    mmLists = {}
-    for pattern in patterns.values():
-        self._print(".")
-        mm = pattern.getAllMatricesFromYDX(self.yd)
-        mm = [(meta,m) for meta,m in mm if .5 not in m and 1 in m]
-        mmLists[pattern] = mm
-    self._print(" %s"%", ".join(["p%s: %d"
-        %(p,len(mm)) for p,mm in mmLists.items()]))
+    tdmIterators = {p:itertools.tee(self._getTdms(p), 2)
+        for p in patterns.values() if self._print(".") or True}
+    tdmIteratorsFresh = {p:e[0] for p,e in tdmIterators.items()}
+    tdmIterators = [(p,e[1]) for p,e in tdmIterators.items()]
     self._print("\n")
 
-    candidates = {} #patternId -> score
-    ci = candidates.items() # will stay sorted
-    validMatrices = {} #patternId -> mList
+    patternScore = {p:0 for p in patterns.values()} #patternId -> score
+    patternScoreSorted = patternScore.items() # will stay sorted
+    validMatrices = {p:[] for p in patterns.values()} #patternId -> mList
     i = 0
-    while True:
-        mm = {p:mm[i] for p,mm in mmLists.items() if len(mm)>i}
-        if len(mm)==0: break
-        valid = [(p,tdm) for p,(meta,m) in mm.items() 
-            for tdm in self._getTdms(p,meta,m) if tdm.check() == True]
-        for p,tdm in valid:
-            validMatrices[p] = validMatrices.get(p,[])+[tdm]
-            candidates[p] = candidates.get(p,0)+1
-        ci = sorted(candidates.items(),
-            key=lambda e:e[1]*10+int(e[0].pid),reverse=True)
-        self._print(("\rTesting matrix #%d. "%i)+
-            ", ".join(["p%s: %d"%(p,amount) for p,amount in ci]))
-        for p in patterns.values():
-            if p.minCount>0 and candidates.get(p,-1) >= p.minCount:
-                self._print("\n")
-                self.validMatrices = validMatrices[p]
-                self.allTDMs = mmLists[p]
-                self.tdm = validMatrices[p][0]
-                self.pattern = p
-                return p
+    while len(tdmIterators) > 0:
+        self._print("\rTesting matrix #%d. "%i)
         i += 1
+        p,it = tdmIterators.pop(0)
+        try: tdm = next(it)
+        except StopIteration: continue
+        tdmIterators.append((p,it))
+        if tdm.check() == False: continue
+        validMatrices[p] += [tdm]
+        patternScore[p] += 1
+        patternScoreSorted = sorted(patternScore.items(),
+            key=lambda e:e[1]*10+int(e[0].pid),reverse=True)
+        self._print(", ".join(["p%s: %d"%(p,amount) 
+                       for p,amount in patternScoreSorted]))
+        if p.minCount>0 and patternScore[p] >= p.minCount:
+            self._print("\n")
+            self.validMatrices = validMatrices[p]
+            self.allTDMs = tdmIteratorsFresh[p]
+            self.tdm = validMatrices[p][0]
+            self.pattern = p
+            return p
     self._print("\n")
-    if len(ci)>0 and ci[0][0].minCount == -1:
-        p = ci[0][0]
+    if len(patternScoreSorted)>0 and patternScoreSorted[0][0].minCount == -1:
+        p = patternScoreSorted[0][0]
         self.validMatrices = validMatrices[p]
-        self.allTDMs = mmLists[p]
+        self.allTDMs = tdmIteratorsFresh[p]
         # self.tdm = most common element from self.validMatrices
         self.tdm = max(set(self.validMatrices), key=self.validMatrices.count)
         self.pattern = p
         return p
     raise YD_Parsing_Error("Cannot detect pattern.",self.yd)
   
-  def _get_dxy(self, x,y, pattern):
+  def _get_dxy(self, pattern,meta):
         """ Returns avg distance between cell edge and dot """
         #return 0,0
+        cropx, cropy, gridx, gridy, cellx, celly = meta
+        x = cropx+gridx+cellx
+        y = cropy+gridy+celly
         di = pattern.d_i*self.yd.imgDpi
         dj = pattern.d_j*self.yd.imgDpi
         #return di/2, dj/2
@@ -155,24 +153,15 @@ class PrintParser(object):
         dots = self.yd.dots.T
         coords = dots[:,(dots[0] >= x) * (dots[0] < x+hps) *
             (dots[1] >= y) * (dots[1] < y+vps)]
-        dx = np.average((coords[0]-x)%di)
+        dx = np.average((coords[0]-x)%di) # FIXME: circaverage?
         dy = np.average((coords[1]-y)%dj)
         return dx, dy
-
-  def _getTdms(self, p,meta,m):
-        cropx, cropy, gridx, gridy, cellx, celly = meta
-        x = cropx+gridx+cellx
-        y = cropy+gridy+celly
-        x_,y_=self._get_dxy(x,y,p)
-        for tdm in p.getAlignedTDMs(m):
-            tdm.atX = x+x_
-            tdm.atY = y+y_
-            tdm.meta_position = meta+(x_,y_)
-            yield tdm
-            #[tdm for t in p.getTransformations(m) 
-            #for tdm in [TDM(pattern=p,m=m,trans=t,atX=x,atY=y)] 
-            #if tdm.check() == True]
-   
+  
+  def _getTdms(self, p):
+    for meta, m in p.getAllMatricesFromYDX(self.yd):
+        meta += self._get_dxy(p, meta)
+        for tdm in p.getAlignedTDMs(meta,m): yield tdm
+    
   def getAllValidTdms(self):
     """ TDMs where redundance check passed """
     for tdm in self.getAllTdms():
@@ -180,9 +169,8 @@ class PrintParser(object):
     
   def getAllTdms(self):
     """ TDMs where redundance check passed or failed """
-    for meta,m in self.allTDMs:
-        for tdm in self._getTdms(self.pattern,meta,m):
-            yield tdm
+    for tdm in self.allTDMs:
+        yield tdm
   
   def getAllCorrectTdms(self):
     """ TDMs where redundance check passed and content is valid """

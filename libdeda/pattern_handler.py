@@ -4,21 +4,16 @@ The patterns and their specific functions
 Align all matrices for each translation and do redundance checks
 
 Example: 
-    from extract_yd import YDX
-    from pattern_handler import TDM, patterns
+    from libdeda.pattern_handler import Pattern4
     
-    matrices = YDX("input.jpg").getAllMatrices(
-        patterns[2].n_i,patterns[2].n_j,patterns[2].d_i,patterns[2].d_j)
-    for m in matrices:
-        transformations = patterns[2].getTransformations(m)
-        for t in transformations:
-            tdm = TDM(m=m, pattern=patterns[2], trans=t)
-            if tdm.check(): 
-                print(tdm)
-                print(tdm.decode())
-                exit()
-            else: print("Invalid matrix, trying other...")
+    tdm = Pattern4()
+    tdm["minutes"] = 55
+    tdm["hour"] = 15
+    print(tdm)
+    print(tdm.decode())
+    if tdm.check() == False: print("Invalid matrix")
 
+    See also: print_parser
 
 Copyright 2018 Timo Richter
 
@@ -28,12 +23,12 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 '''
 
-import argparse, os, sys, math, random
+import argparse, os, sys, math, random, datetime
 import numpy as np
 from libdeda.extract_yd import MatrixTools, matrix2str, array2str
 
 
-class _MatrixParserInterface(object):
+class _PatternInterface(object):
 
     """
     Interface
@@ -82,76 +77,36 @@ class _SetPatternId(type):
         return c
         
         
-class _AbstractMatrixParser(_MatrixParserInterface,
-                            metaclass=_SetPatternId):
+class _PatternInstantiationMixin(object):
 
-    # Size
-    n_i = -1
-    n_j = -1
-    d_i = -1
-    d_j = -1
-    
-    empty=[] # list of coordinate tuples where matrix should not have dots
-    markers=[]
-    codebits=[]
-    allowFlip=False # analyse the horizontally flipped matrix as well
-    allowUpsideDown=True
-    allowRotation = True # If true, finds a pattern rotated by 90 degree
-    
-    # When reading, do a majority decision for @minCount TDMs. At least this
-    # amount of valid TDMs has to be detected for a certain pattern. -1=all
-    minCount = 1
-
-    # List of (x,y) coordinates from where (0+i,0+j) shall be mapped to
-    # (x+i, y+j) for all i,j
-    repetitions = []
-    
-    # For offset patterns: Define distance between markers, default: n_i, n_j
-    n_i_prototype = property(lambda self:self.n_i)
-    n_j_prototype = property(lambda self:self.n_j)
-    
-    hps = property(lambda self:self.n_i*self.d_i)
-    vps = property(lambda self:self.n_j*self.d_j)
-    
-    def __init__(self, m=None):
-        dtype = np.uint8
-        shape = (self.n_i_prototype, self.n_j_prototype)
-        self.aligned = np.zeros(shape, dtype)
-        for x,y in self.markers: self.aligned[x,y] = 1
-        if m is not None:
-            for x,y in self.codebits: self.aligned[x,y] = m[x,y]
-    
-    def __call__(self, *args, **xargs):
-        """ Create a new instance, object acts as class constructor """
-        return self.__class__(*args,**xargs)
-        
-    @classmethod
-    def __int__(self):
-        pid = ''.join(list(filter(str.isdigit, self.__name__)))
-        if len(pid) > 0: return int(pid)
-
-    def __str__(self):
-        return self.__class__.__name__.replace("Pattern","")
-    
-    def __hash__(self):
-        return hash(self.__class__.__name__)
-    
-    def checkUnaligned(self,unaligned):
-        return True
-
-    @classmethod
     def getAllMatricesFromYDX(pattern, ydx):
+        """ 
+        Cuts the matrix from YDX into pieces according to this class
+            pattern.
+        @ydx: extract_yd.YDX instance
+        @returns: [(meta, matrix)]
+        """
         mm = ydx.getAllMatrices(
             pattern.n_i, pattern.n_j, pattern.d_i, pattern.d_j
         )#,cutLength=(ni*di,nj*dj))
-        if pattern.allowRotation: mm += ydx.getAllMatrices(
-            pattern.n_j, pattern.n_i, pattern.d_j, pattern.d_i)
+        if pattern.allowRotation: 
+            mm2 = ydx.getAllMatrices(
+                pattern.n_j, pattern.n_i, pattern.d_j, pattern.d_i)
+            mm = [x for y in zip(mm,mm2) for x in y]
+        mm = [(meta,m) for meta,m in mm if .5 not in m and 1 in m]
         return mm
+    
+    def getAlignedTDMs(self, meta, unaligned):
+        cropx, cropy, gridx, gridy, cellx, celly, dcellx, dcelly = meta
+        x = cropx+gridx+cellx+dcellx
+        y = cropy+gridy+celly+dcelly
+        for t in self._getTransformations(unaligned):
+            tdm = TDM(self.applyTransformation(unaligned,t), atX=x, atY=y)
+            tdm.meta_position = meta
+            yield tdm
 
-    def getAlignedTDMs(self, unaligned):
-        for t in self.getTransformations(unaligned):
-            aligned = self.applyTransformation(unaligned,t)
-            yield TDM(pattern=self(aligned), trans=t)
+
+class _PatternAligningMixin(object):
 
     def applyTransformation(self, unaligned, t):
         """ Align matrix @unaligned according to transformation @t """
@@ -160,11 +115,12 @@ class _AbstractMatrixParser(_MatrixParserInterface,
         if t.get("rot"): m=np.rot90(m,t["rot"])
         m = np.roll(m,(t["x"],t["y"]),(0,1))
         m = m[0:self.n_i_prototype, 0:self.n_j_prototype]
-        return m
+        return self(m,t)
     
-    def undoTransformation(self, aligned, t):
-        """ Unalign matrix @aligned according to transformation @t """
-        m = aligned
+    def undoTransformation(self):
+        """ Undo align matrix """
+        m = self.aligned
+        t = self.trans
         m2 = np.zeros((self.n_i, self.n_j),dtype=np.uint8)
         for x in range(m.shape[0]):
             for y in range(m.shape[1]):
@@ -176,7 +132,7 @@ class _AbstractMatrixParser(_MatrixParserInterface,
         if t.get("flip"): m=np.fliplr(m)
         return m
         
-    def getTransformations(self,unaligned):
+    def _getTransformations(self,unaligned):
         """
         Get list of possible geometrical transformations to align a matrix
         @unaligned numpy matrix,
@@ -217,7 +173,78 @@ class _AbstractMatrixParser(_MatrixParserInterface,
         return l
         
 
-class _Pattern1(_AbstractMatrixParser):
+class _AbstractPattern(_PatternInstantiationMixin, _PatternInterface,
+                       _PatternAligningMixin, metaclass=_SetPatternId):
+    """
+    Abstract pattern class
+    Child classes represent patterns and must provide a full 
+    PatternInterface. 
+    A class represents a pattern, an object represents a TDM.
+    """
+
+    # Size
+    n_i = -1
+    n_j = -1
+    d_i = -1
+    d_j = -1
+    
+    empty=[] # list of coordinate tuples where matrix should not have dots
+    markers=[]
+    codebits=[]
+    allowFlip=False # analyse the horizontally flipped matrix as well
+    allowUpsideDown=True
+    allowRotation = True # If true, finds a pattern rotated by 90 degree
+    
+    # When reading, do a majority decision for @minCount TDMs. At least this
+    # amount of valid TDMs has to be detected for a certain pattern. -1=all
+    minCount = 1
+
+    # List of (x,y) coordinates from where (0+i,0+j) shall be mapped to
+    # (x+i, y+j) for all i,j
+    repetitions = []
+    
+    # For offset patterns: Define distance between markers, default: n_i, n_j
+    n_i_prototype = property(lambda self:self.n_i)
+    n_j_prototype = property(lambda self:self.n_j)
+    
+    hps = property(lambda self:self.n_i*self.d_i)
+    vps = property(lambda self:self.n_j*self.d_j)
+    
+    def __init__(self, m=None, trans=None):
+        self.trans = trans
+        dtype = np.uint8
+        shape = (self.n_i_prototype, self.n_j_prototype)
+        self.aligned = np.zeros(shape, dtype)
+        for x,y in self.markers: self.aligned[x,y] = 1
+        if m is not None:
+            for x,y in self.codebits: self.aligned[x,y] = m[x,y]
+    
+    def __call__(self, *args, **xargs):
+        """ Create a new instance, object acts as class constructor """
+        return self.__class__(*args,**xargs)
+        
+    @classmethod
+    def __int__(self):
+        pid = ''.join(list(filter(str.isdigit, self.__name__)))
+        if len(pid) > 0: return int(pid)
+
+    def __str__(self):
+        return self.__class__.__name__.replace("Pattern","")
+    
+    def __hash__(self):
+        return hash("%s%s"%(
+            self.__class__.__name__,
+            "".join([str(int(x)) for x in self.aligned.flat]))
+        )
+        
+    def __eq__(self, o):
+        return hash(self) == hash(o)
+
+    def checkUnaligned(self,unaligned):
+        return True
+
+
+class _Pattern1(_AbstractPattern):
   
   s = None # Pattern specific s parameter
   n_i = 32
@@ -287,7 +314,7 @@ class Pattern1s3(_Pattern1):
                 +[(x,y) for x in (0,2,4,6,8,10,12,14) for y in range(1,16)]
         
 
-class Pattern2(_AbstractMatrixParser):
+class Pattern2(_AbstractPattern):
 
   n_i = 18
   n_j = 23
@@ -366,7 +393,7 @@ class Pattern2(_AbstractMatrixParser):
     return anon
     
 
-class Pattern3(_AbstractMatrixParser):    
+class Pattern3(_AbstractPattern):    
 
   n_i = 24
   n_j = 48
@@ -374,16 +401,18 @@ class Pattern3(_AbstractMatrixParser):
   d_j = .02
   n_i_prototype = 24
   n_j_prototype = 16
+  repetitions = [(8,16),(16,32)]
   #alignment = dict(markers = [(0,4+1),(0,1+1),(2,1+1)])
   markers = [(0,4),(0,1),(2,1)]
-  blocks = [[((bx*4+by+x)%24,(3*by+1+y)%16) for y in range(3) for x in range(2)]
+  blocks = [[((bx*4+by+x)%24,(3*by+1+y)%16) for y in range(3) 
+                                            for x in range(2)]
         for by in range(5) for bx in range(6) if bx+by>=2]
-  repetitions = [(8,16),(16,32)]
   
   @property
   def codebits(self):
     a = np.array(np.array(self.blocks).flat)
-    return a.reshape((len(a)/2,2))
+    assert(len(a) == round(len(a)))
+    return a.reshape((int(len(a)/2),2))
 
   def checkUnaligned(self, m):
     return 30 in [np.sum(m[:,0:16]),np.sum(m[:,16:32]),np.sum(m[:,32:48])]
@@ -422,7 +451,7 @@ class Pattern3(_AbstractMatrixParser):
     return anon
 
 
-class Pattern4(_AbstractMatrixParser):
+class Pattern4(_AbstractPattern):
 
   n_i = 16
   n_j = 32
@@ -430,12 +459,16 @@ class Pattern4(_AbstractMatrixParser):
   d_j = .04
   n_i_prototype = 8
   n_j_prototype = 16
-  empty = [(x,y) for x in range(8,16) for y in range(0,17)]
-  allowFlip=True
-  #markers = [(x,6) for x in range(1,4)] #1,8
-  manufacturers = {0:"Xerox", 3:"Epson", 20: "Dell", 4: "Xerox"}
-  codebits = [(x,y) for x in range(8) for y in range(1,16)]
   repetitions = [(8,16)]
+  empty = [(x,y) for x in range(8,16) for y in range(0,17)]
+  codebits = [(x,y) for x in range(8) for y in range(1,16)]
+  #markers = [(x,6) for x in range(1,4)] #1,8
+  allowFlip=True
+  manufacturers = {0:"Xerox", 3:"Epson", 20: "Dell", 4: "Xerox"}
+  format = dict(
+        minutes=14, hour=11, day=10, month=9, year=8, serial=(3,4,5),
+        unknown1=13, manufacturer=12, unknown3=7, unknown4=2, unknown5=1,
+        printer=(2,3,4,5), raw=tuple(range(1,15)))
     
   def checkUnaligned(self,m):
     # max. two rows and cols with even amount of dots
@@ -452,28 +485,52 @@ class Pattern4(_AbstractMatrixParser):
     )
     return bool(r)
   
+  def __getitem__(self, name): # decoding feature
+    rows = self.format[name]
+    if not isinstance(rows,tuple): rows = (rows,)
+    decoded = "".join(["%02d"%int(array2str(self.aligned[1:,row]),2) 
+        for row in rows])
+    if name == "manufacturer":
+        if decoded.isdigit() and int(decoded) in self.manufacturers: 
+            return self.manufacturers.get(int(decoded))
+        else: return "Xerox/Dell/Epson"
+    elif name == "serial":
+        if self["manufacturer"] == "Dell": return None
+        else: return "-%s-"%decoded
+    else: return decoded
+  
+  def __setitem__(self, name, value): # decoding feature
+    value = str(value)
+    if name == "serial": value = value.replace("-","")
+    if name == "manufacturer" and not value.isdigit():
+        manufacturersRev = {v:k for k,v in manufacturers.items()}
+        if value not in manufacturersRev: 
+            raise KeyError("'%s' is not a valid manufacturer."%value)
+        value = manufacturersRev[value]
+    assert(value.isdigit())
+    rows = self.format[name]
+    if not isinstance(rows,tuple): rows = (rows,)
+    if len(value)%2 != 0: value = "0%s"%value
+    assert(len(value)/2 == len(rows))
+    for i in range(len(rows)):
+        v = value[i:i+2]
+        row = rows[i]
+        valbin = list(map(int, bin(int(v))[2:]))
+        while len(valbin) < 8: valbin = [0]+valbin # fill 
+        valbin[0] = 1-np.sum(valbin)%2 # parity
+        self.aligned[:,row] = valbin
+    self.aligned[:,15] = 1-np.sum(self.aligned[:,1:15],axis=1)%2 # parity
+    self.aligned[0,15] = 1-np.sum(self.aligned[1:8,15])%2
+    
   def decode(self,aligned):
-    m = aligned[0:8,1:16]
-    m = np.rot90(m) # same shape as EFF
-    format = dict(
-        minutes=1, hour=4, day=5, month=6, year=7, serial=(12,11,10),
-        unknown1=2, manufacturer=3, unknown3=8, unknown4=13, unknown5=14,
-        printer=(13,12,11,10))
-    decoded = {}
-    for key,cols in format.items():
-        if not isinstance(cols,tuple): cols = (cols,)
-        decoded[key] = "".join(
-            ["%02d"%int(array2str(m[col,1:]),2) for col in cols])
-    decoded["raw"] = "".join(["%02d"%int(array2str(m[col+1,1:]),2) 
-        for col in range(m.shape[0]-1)])
-    if decoded["manufacturer"].isdigit() \
-            and int(decoded["manufacturer"]) in self.manufacturers: 
-        decoded["manufacturer"] = self.manufacturers.get(
-            int(decoded["manufacturer"]))
-    else: decoded["manufacturer"] = "Xerox/Dell/Epson"
-    if decoded["manufacturer"] == "Dell": decoded["serial"] = None
-    else: decoded["serial"] = "-%s-"%decoded["serial"]
-    return decoded
+    d = {k:self[k] for k in self.format.keys()}
+    centuries = np.array([2000,1900])
+    century = centuries[np.argmin(np.abs(centuries+int(d["year"])-2018))]
+    d["timestamp"] = datetime.datetime(
+        century+int(d["year"]),
+        *tuple([int(d[key]) for key in ["month","day","hour","minutes"]])
+    )
+    return d
     
   def createMask(self,m):
     anon = np.zeros(m.shape,dtype=np.uint8)
@@ -497,29 +554,23 @@ patterns = {cls.pid:cls()
 
 class TDM(object):
     """
-    An aligned Tracking Dots Matrix
+    An aligned Tracking Dots Matrix. Decorating descendants from
+    AbstractPattern
     """
     
-    def __init__(self, pattern, trans, atX=-1, atY=-1):
+    def __init__(self, pattern, atX=-1, atY=-1):
         """
-        One of @m or @aligned is required. @aligned must be @m transformed
-            according to @trans.
-        
-        pattern _MatrixParserInterface pattern object,
-        trans dict transformation dict,
+        pattern _PatternInterface pattern object,
         atX int position on paper in pixels,
         atY int,
-        m np.array untransformed matrix,
-        aligned np.array transformed matrix,
         """
         self.pattern = pattern
         self.aligned = pattern.aligned
-        self.trans = trans
         self.atX = atX
         self.atY = atY
         
     def __getattr__(self, name):
-        return getattr(self.pattern,name)(self.m)
+        return getattr(self.pattern,name)
         
     def decode(self):
         return self.pattern.decode(self.aligned)
@@ -532,7 +583,7 @@ class TDM(object):
         if addTdm: mask = np.array((self.aligned+mask)>0,dtype=np.uint8)
         return TDM(
             atX=self.atX,atY=self.atY,
-            pattern=self.pattern(mask),trans=self.trans)
+            pattern=self.pattern(mask,self.pattern.trans))
         
     def __str__(self):
         return matrix2str(self.aligned)
@@ -541,13 +592,5 @@ class TDM(object):
         return "<TDM of Pattern %s at %d x %d pixels>"%(
             self.pattern,self.atX,self.atY)
         
-    def undoTransformation(self):
-        return self.pattern.undoTransformation(self.aligned,self.trans)
-        
-    def __hash__(self):
-        return hash("".join([str(int(x)) for x in self.aligned.flat]))
-        
-    def __eq__(self, o):
-        return hash(self) == hash(o)
         
         
