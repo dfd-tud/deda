@@ -113,6 +113,7 @@ class PrintParser(object):
     self._print("\n")
 
     candidates = {} #patternId -> score
+    ci = candidates.items() # will stay sorted
     validMatrices = {} #patternId -> mList
     i = 0
     while True:
