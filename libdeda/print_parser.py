@@ -77,7 +77,8 @@ class PrintParser(object):
 
   def _createYD_instance(self,**xargs):
     self._print("Extracting dots...\n")
-    ydxArgs = self._ydxArgs.copy()
+    ydxArgs = dict(verbose=-1)
+    ydxArgs.update(self._ydxArgs)
     ydxArgs.update(**xargs)
     rotation = ydxArgs.pop("rotation",True)
     try:
