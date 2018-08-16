@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*- 
 
 import sys
+from io import BytesIO
 from wand.image import Image as WandImage
 from libdeda.pattern_handler import Pattern4, TDM
-from libdeda.privacy import AnonmaskCreator, AnonmaskApplierClass, \
-                            createCalibrationpage, calibrationScan2Anonmask, \
-                            AnonmaskApplier
+from libdeda.privacy import AnonmaskApplierTdm, AnonmaskApplier, \
+                            createCalibrationpage, calibrationScan2Anonmask
 from libdeda.print_parser import PrintParser
 
 calibrationPage = createCalibrationpage()
@@ -23,26 +23,20 @@ tdm = TDM(tdm)
 print(tdm)
 print(tdm.decode())
 
-def tdm2page(tdm,page=None):
-    proto = AnonmaskCreator.tdm2mask(tdm, True)
-    aa = AnonmaskApplierClass(
-        proto, tdm.hps, tdm.vps, xoffset=-2, yoffset= -1)
-    if page is None: return aa._createMask()
-    else: return aa.apply(page)
-    
 if __name__ == "__main__":
-    calibrationPageDotsPdf = tdm2page(tdm,calibrationPage)
-    with WandImage(file=calibrationPageDotsPdf,format="pdf",resolution=300
-    ) as wim:
+    aa = AnonmaskApplierTdm(tdm,xoffset=-2,yoffset=-1)
+    calibrationPageDotsPdf = aa.apply(calibrationPage)
+    with WandImage(file=BytesIO(calibrationPageDotsPdf),format="pdf",
+                   resolution=300) as wim:
         calibrationPageDotsPng = wim.make_blob("png")
     with open("calibrationpage-printed.png","wb") as fp:
         fp.write(calibrationPageDotsPng)
-    with open("calibrationpage.pdf","wb" as fp:
+    with open("calibrationpage.pdf","wb") as fp:
         fp.write(calibrationPage)
     
     mask = calibrationScan2Anonmask(calibrationPageDotsPng)
     masked = AnonmaskApplier(mask).apply(calibrationPageDotsPdf)
-    with WandImage(file=masked,format="pdf",resolution=300) as wim:
+    with WandImage(file=BytesIO(masked),format="pdf",resolution=300) as wim:
         maskedpng = wim.make_blob("png")
     with open("calibrationpage-masked.png","wb") as fp: fp.write(maskedpng)
     

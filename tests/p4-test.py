@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*- 
 
 import sys
+from io import BytesIO
 from wand.image import Image as WandImage
 from libdeda.pattern_handler import Pattern4, TDM
-from libdeda.privacy import AnonmaskCreator, AnonmaskApplierClass
+from libdeda.privacy import AnonmaskApplierTdm
 from libdeda.print_parser import PrintParser
 
-tdm = Pattern4()
+tdm = Pattern4(trans=dict(rot=1))
 tdm["serial"] = 123456
 tdm["manufacturer"] = "Epson"
 tdm["hour"] = 11
@@ -20,15 +21,10 @@ print(tdm)
 print(tdm.decode())
 assert(tdm.check() == True)
 
-def tdm2pdf(tdm):
-    proto = AnonmaskCreator.tdm2mask(tdm, True)
-    aa = AnonmaskApplierClass(
-        proto, tdm.hps, tdm.vps, xoffset=-2, yoffset= -1)
-    return aa._createMask()
-    
 if __name__ == "__main__":
-    pdf = tdm2pdf(tdm)
-    with WandImage(file=pdf,format="pdf",resolution=300) as wim:
+    aa = AnonmaskApplierTdm(tdm,xoffset=-2,yoffset=-1)
+    pdf = aa.apply(None)
+    with WandImage(file=BytesIO(pdf),format="pdf",resolution=300) as wim:
         imbin = wim.make_blob("png")
     # verify
     pp = PrintParser(imbin,ydxArgs=dict(inputDpi=300))
