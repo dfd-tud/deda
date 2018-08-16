@@ -130,7 +130,10 @@ class _PatternAligningMixin(object):
         #m = np.roll(m,(-d["x"],-d["y"]),(0,1))
         if t.get("rot"): m=np.rot90(m,4-t["rot"])
         if t.get("flip"): m=np.fliplr(m)
-        return m
+        if t.get("rot",0)%2 == 0:
+            return m, self.hps, self.vps
+        else:
+            return m, self.vps, self.hps
         
     def _getTransformations(self,unaligned):
         """
