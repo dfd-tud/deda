@@ -80,6 +80,7 @@ def createCalibrationpage():
 
 class AnonmaskCreator(object):
     """
+    Scan -> mask
     Parse scanned calibration page and create prototype of anonymisation mask
     that can be applied on pages of any size by AnonmaskApplier
     """
@@ -107,9 +108,9 @@ class AnonmaskCreator(object):
         self.getPageScaling()
         self.restorePerspective()
         tdm, xOffset, yOffset = self.readTDM()
-        dots_proto = self.tdm2mask(tdm, *args, **xargs)
+        dots_proto, hps, vps = self.tdm2mask(tdm, *args, **xargs)
         maskdata = dict(
-            proto=dots_proto, hps=tdm.hps, vps=tdm.vps, x_offset=xOffset,
+            proto=dots_proto, hps=hps, vps=vps, x_offset=xOffset,
             y_offset=yOffset, pagesize=CALIBRATIONPAGE_SIZE, 
             scale=self.scaling, format_ver=MASK_VERSION)
         return json.dumps(maskdata).encode("ascii")
@@ -311,20 +312,21 @@ class AnonmaskCreator(object):
         # create mask
         tdm = tdm if copy else tdm.createMask()
         #m = tdm.aligned
-        m = tdm.undoTransformation()
+        m, hps, vps = tdm.undoTransformation()
         #m = np.roll(m,(tdm.trans["x"],tdm.trans["y"]),(0,1))
         dots_proto = [((x*di), (y*dj))
             for x in range(m.shape[0]) for y in range(m.shape[1]) 
             if m[x,y] == 1]
-        return dots_proto
+        return dots_proto, hps, vps
         
 
 def calibrationScan2Anonmask(imbin, copy=False):
     return AnonmaskCreator(imbin)(copy)
     
 
-class AnonmaskApplierClass(object):
+class AnonmaskApplierCommon(object):
     """
+    Mask -> PDF
     Apply the anonymisation mask created by AnonmaskCreator to a page for 
     printing
     """
@@ -346,6 +348,10 @@ class AnonmaskApplierClass(object):
         if debug: self.colour = MAGENTA
 
     def apply(self, inPdf):
+        """
+        @inPdf pdf binary, None for empty page
+        """
+        if inPdf is None: return self._createMask()
         inPdf = self.pdfNormaliseFormat(inPdf,*self.pagesize) # force A4
         if "wand" in globals():
             return self.pdfWatermark(inPdf, self._createMask, True)
@@ -395,7 +401,7 @@ class AnonmaskApplierClass(object):
         c.showPage()
         c.save()
         io.seek(0)
-        return io
+        return io.read()
     
     @staticmethod
     def pdfNormaliseFormat(pdfin, width, height):
@@ -438,7 +444,7 @@ class AnonmaskApplierClass(object):
         
         for p_nr in range(input_.getNumPages()):
             page = input_.getPage(p_nr)
-            mask = PdfFileReader(maskCreator(page)).getPage(0)
+            mask = PdfFileReader(BytesIO(maskCreator(page))).getPage(0)
             if foreground:
                 page.mergePage(mask)
                 output.addPage(page)
@@ -455,7 +461,7 @@ class AnonmaskApplierClass(object):
         return outIO.read()
 
 
-class AnonmaskApplierJson(AnonmaskApplierClass):
+class AnonmaskApplierJson(AnonmaskApplierCommon):
 
     def __init__(self, mask, **xargs):
         d = json.loads(mask)
@@ -466,13 +472,21 @@ class AnonmaskApplierJson(AnonmaskApplierClass):
         self.pagesize = d["pagesize"]
         super(AnonmaskApplierJson,self).__init__(
             d["proto"], d["hps"], d["vps"],
-            xOffset = xargs.pop("xoffset",None) or d["x_offset"],
-            yOffset = xargs.pop("yoffset",None) or d["y_offset"],
+            xoffset = xargs.pop("xoffset",None) or d["x_offset"],
+            yoffset = xargs.pop("yoffset",None) or d["y_offset"],
             scale = xargs.pop("scale",None) or d["scale"],
             **xargs)
 
 
 AnonmaskApplier = AnonmaskApplierJson
+
+
+class AnonmaskApplierTdm(AnonmaskApplierCommon):
+    """ TDM to PDF """
+    
+    def __init__(self, tdm, copy=True, **xargs):
+        super(AnonmaskApplierTdm,self).__init__(
+            *AnonmaskCreator.tdm2mask(tdm, copy), **xargs)
 
 
 class ScanCleaner(ImgProcessingMixin):
