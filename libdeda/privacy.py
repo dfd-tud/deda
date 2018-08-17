@@ -245,9 +245,8 @@ class AnonmaskCreator(object):
 
         xOffsets = [tdm.xoffset for tdm in tdms]
         yOffsets = [tdm.yoffset for tdm in tdms]
-        xOffset = circmean(xOffsets, high=pp.tdm.n_i_prototype*pp.tdm.d_i)
-        yOffset = circmean(yOffsets, high=pp.tdm.n_j_prototype*pp.tdm.d_j)
-        
+        xOffset = circmean(xOffsets, high=pp.tdm.hps_prototype)
+        yOffset = circmean(yOffsets, high=pp.tdm.vps_prototype)
         """
         hps2 = pp.tdm.pattern.d_i*pp.tdm.pattern.n_i_prototype
         vps2 = pp.tdm.pattern.d_j*pp.tdm.pattern.n_j_prototype
