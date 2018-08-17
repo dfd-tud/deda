@@ -414,18 +414,18 @@ class RasterMixin(Common):
         """
         if len(dots)==0: raise Exception("Argument dots must not be empty.")
         self._print(2,"Raster detection... \n")
-        sepX0 = self._getGridDelta(dots[:,0],distanceX)
-        sepY0 = self._getGridDelta(dots[:,1],distanceY)
-        shape = (int(math.floor(float(inked.shape[1]+distanceX-sepX0)/distanceX))+1,
-            int(math.floor(float(inked.shape[0]+distanceY-sepY0)/distanceY))+1)
+        sepX0 = self._getGridDelta(dots[:,0],distanceX)-distanceX
+        sepY0 = self._getGridDelta(dots[:,1],distanceY)-distanceY
+        shape = (int(math.floor(float(inked.shape[1]-sepX0)/distanceX))+1,
+                 int(math.floor(float(inked.shape[0]-sepY0)/distanceY))+1)
         matrix = np.zeros(shape=shape,dtype=np.float16)
         self._print(2,"Output dimensions: %d x %d "%matrix.shape)
         self._print(2,"Writing matrix...")
         self._print(4,"X-Separators: %d, %d, %d, ..."%(sepX0,sepX0+distanceX,sepX0+2*distanceX))
         
         for xdot,ydot in dots:
-            xcell = int(math.floor(float(xdot+distanceX-sepX0)/distanceX))
-            ycell = int(math.floor(float(ydot+distanceY-sepY0)/distanceY))
+            xcell = int(math.floor(float(xdot-sepX0)/distanceX))
+            ycell = int(math.floor(float(ydot-sepY0)/distanceY))
             matrix[xcell,ycell] = 1 #if inked[ydot,xdot] != 0 else .5
         
         matrixInked = cv2.resize(inked.T,(matrix.shape[1],matrix.shape[0]))
@@ -447,7 +447,7 @@ class RasterMixin(Common):
             if len(matrixpltinked)>0:
                 plt.scatter(matrixpltinked[:,0],matrixpltinked[:,1]*-1,color="r")
             plt.show()
-        return sepX0-distanceX, sepY0-distanceY, matrix
+        return sepX0, sepY0, matrix
 
 
 class MatrixTools(object):
