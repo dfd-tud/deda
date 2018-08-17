@@ -4,9 +4,9 @@ The patterns and their specific functions
 Align all matrices for each translation and do redundance checks
 
 Example: 
-    from libdeda.pattern_handler import Pattern4
+    from libdeda.pattern_handler import Pattern4, TDM
     
-    tdm = Pattern4()
+    tdm = TDM(Pattern4)
     tdm["minutes"] = 55
     tdm["hour"] = 15
     print(tdm)
@@ -62,10 +62,10 @@ class _PatternInterface(object):
         
     def createMask(self, aligned):
         """
-        Returns anonymisation mask. United with @m it will contain
+        Returns anonymisation mask. United with @aligned it will contain
             ambiguous information.
         Input: aligned matrix
-        Output: matrix of same shape as m
+        Output: matrix of same shape as aligned
         """
         
 
