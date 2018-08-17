@@ -54,6 +54,7 @@ class PrintParser(object):
     self.allTDMs = []
     self.pattern = None
     self.tdm = None
+    self.dpi = None
     exceptions = []
     
     #colourProfiles = [YELLOW_STRICTHUE,YELLOW_GREEDY,YELLOW_STRICT,YELLOW_STRICTHUE_GREEDYSAT]
@@ -77,14 +78,16 @@ class PrintParser(object):
 
   def _createYD_instance(self,**xargs):
     self._print("Extracting dots...\n")
-    ydxArgs = dict(verbose=-1)
+    ydxArgs = dict(verbose=-1, inputDpi=self.dpi)
     ydxArgs.update(self._ydxArgs)
     ydxArgs.update(**xargs)
     rotation = ydxArgs.pop("rotation",True)
     try:
         yd = YDX(**ydxArgs)
     except TooManyDotsException as e:
+        self.dpi = e.yd.imgDpi
         raise YD_Parsing_Error("Too many dots found.",None)
+    self.dpi = yd.imgDpi
     if not yd.hasDots: raise YD_Parsing_Error("No dots found.",yd)
     yd.cleanDotPositions(crop=False,rotation=rotation)
     self.yd = yd
