@@ -254,8 +254,8 @@ class ImgProcessingMixin(RotationMixin,CommonImageFunctions,Common):
             x2 = max(max(cnt[:,:,0]))
             y1 = min(min(cnt[:,:,1]))
             y2 = max(max(cnt[:,:,1]))
-            x = int(x1+(x2-x1)/2.0)
-            y = int(y1+(y2-y1)/2.0)
+            x = (x1+(x2-x1)/2.0)
+            y = (y1+(y2-y1)/2.0)
             X.append(x)
             Y.append(y)
         dots = np.transpose(np.array([X,Y]))
@@ -356,7 +356,7 @@ class RasterMixin(Common):
         distances = np.abs(dots[:,axis]-dots[neighbours,axis])
         distances = distances[distances>0]
         
-        f = np.bincount(distances)
+        f = np.bincount(np.array(distances,dtype=np.uint16))
         #print(f[:15])
         #return np.argmax(f)
         self._print(3,"\n%s\n"%f[:30])
@@ -400,7 +400,7 @@ class RasterMixin(Common):
         """
 
     def _getGridDelta(self,Axis,distance):
-            count = np.bincount(Axis)
+            count = np.bincount(np.array(Axis,dtype=np.uint16))
             sep0 = (np.argmax(count)-1.0*distance/2)%distance
             #return int(math.floor(sep0))
             return sep0
