@@ -20,6 +20,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 import os, sys, random, math, itertools
 import numpy as np
+from scipy.stats import circmean
 from libdeda.extract_yd import YDX, TooManyDotsException, matrix2str, \
     YELLOW_STRICT, YELLOW2, YELLOW_STRICTHUE, YELLOW_GREEDY, \
     YELLOW_STRICTHUE_GREEDYSAT, YELLOW_PURE
@@ -143,28 +144,28 @@ class PrintParser(object):
         return p
     raise YD_Parsing_Error("Cannot detect pattern.",self.yd)
   
-  def _get_dxy(self, pattern,meta):
+  def _get_dxy(self, p, meta, m):
         """ Returns avg distance between cell edge and dot """
         #return 0,0
-        cropx, cropy, gridx, gridy, cellx, celly = meta
-        x = cropx+gridx+cellx
-        y = cropy+gridy+celly
-        di = pattern.d_i*self.yd.imgDpi
-        dj = pattern.d_j*self.yd.imgDpi
         #return di/2, dj/2
-        hps = pattern.n_i*di
-        vps = pattern.n_j*dj
-        dots = self.yd.dots.T
-        coords = dots[:,(dots[0] >= x) * (dots[0] < x+hps) *
-            (dots[1] >= y) * (dots[1] < y+vps)]
-        dx = np.average((coords[0]-x)%di) # FIXME: circaverage?
-        dy = np.average((coords[1]-y)%dj)
+        #cropx, cropy, gridx, gridy, cellx, celly = meta
+        x = sum(meta[slice(0,len(meta),2)])
+        y = sum(meta[slice(1,len(meta),2)])
+        dots = self.yd.dots.T/self.yd.imgDpi
+        coords = dots[:,(dots[0] >= x) * (dots[0] < x+p.d_i*m.shape[0]) *
+            (dots[1] >= y) * (dots[1] < y+p.d_j*m.shape[1])]
+        dx = np.average((coords[0]-x)%p.d_i)
+        dy = np.average((coords[1]-y)%p.d_j)
+        #dx = circmean((coords[0]-x)%p.d_i, high=p.d_i)
+        #dy = circmean((coords[1]-y)%p.d_j, high=p.d_j)
         return dx, dy
   
   def _getTdms(self, p):
     for meta, m in p.getAllMatricesFromYDX(self.yd):
-        meta += self._get_dxy(p, meta)
         meta = tuple([e/self.yd.imgDpi for e in list(meta)])
+        meta += self._get_dxy(p, meta, m)
+        # add half a pixel because of pixel-inch inaccuracy
+        meta += (.5/self.yd.imgDpi, .5/self.yd.imgDpi) 
         for tdm in p.getAlignedTDMs(meta,m): yield tdm
     
   def getAllValidTdms(self):
