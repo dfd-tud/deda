@@ -11,7 +11,7 @@ from libdeda.print_parser import PrintParser
 
 calibrationPage = createCalibrationpage()
 
-tdm = TDM(Pattern4,trans=dict(rot=0))
+tdm = TDM(Pattern4,trans=dict(rot=3,flip=True))
 tdm["serial"] = 123456
 tdm["manufacturer"] = "Epson"
 tdm["hour"] = 11
@@ -22,13 +22,16 @@ tdm["year"] = 18
 print(tdm)
 print(tdm.decode())
 
+xoffset, yoffset = tdm.hps_prototype/2, tdm.vps_prototype/2
+#print(xoffset, yoffset)
+aa = AnonmaskApplierTdm(tdm,xoffset=xoffset,yoffset=yoffset)
+calibrationPageDotsPdf = aa.apply(calibrationPage)
+with WandImage(file=BytesIO(calibrationPageDotsPdf),format="pdf",
+               resolution=300) as wim:
+    calibrationPageDotsPng = wim.make_blob("png")
+
 
 if __name__ == "__main__":
-    aa = AnonmaskApplierTdm(tdm,xoffset=-2,yoffset=-1)
-    calibrationPageDotsPdf = aa.apply(calibrationPage)
-    with WandImage(file=BytesIO(calibrationPageDotsPdf),format="pdf",
-                   resolution=300) as wim:
-        calibrationPageDotsPng = wim.make_blob("png")
     with open("calibrationpage-printed.png","wb") as fp:
         fp.write(calibrationPageDotsPng)
     with open("calibrationpage.pdf","wb") as fp:
