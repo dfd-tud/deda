@@ -101,12 +101,17 @@ class _PatternInstantiationMixin(object):
         for t in self._getTransformations(unaligned):
             aligned = self.applyTransformation(unaligned,t)
             tdm = TDM(self, aligned, t)
-            meta_ = meta+(-t.pop("x")*tdm.d_i, -t.pop("y")*tdm.d_j)
-            #meta_ = meta
-            #cropx, cropy, gridx, gridy, cellx, celly, dcellx, dcelly, transx, transy = meta_
+            
+            # t --> tdm.atX, tdm.atY
+            x, y = t.pop("x"), t.pop("y")
+            if tdm.rotated: x,y = y,x
+            if t.get("rot") in (1,2): y = -y-tdm.n_j_prototype
+            if (t.get("rot") in (2,3)) != t.get("flip",False): 
+                x = -x-tdm.n_i_prototype
+            meta_ = meta+(-x*tdm.d_i, -y*tdm.d_j)
+            
             tdm.atX = sum(meta_[slice(0,len(meta_),2)])
             tdm.atY = sum(meta_[slice(1,len(meta_),2)])
-            #assert(tdm.atY == cropy+gridy+celly+dcelly+transy)
             tdm.meta_position = meta_
             yield tdm
 
@@ -117,7 +122,7 @@ class _AligningMixin(object):
         """ Align matrix @unaligned according to transformation @t """
         assert(isinstance(self, _AbstractPattern))
         m = unaligned
-        if t.get("flip"): m=np.fliplr(m)
+        if t.get("flip"): m=np.flipud(m)
         if t.get("rot"): m=np.rot90(m,t["rot"])
         m = np.roll(m,(t["x"],t["y"]),(0,1))
         m = m[0:self.n_i_prototype, 0:self.n_j_prototype]
@@ -138,7 +143,7 @@ class _AligningMixin(object):
         m = m2
         if "x" in t: m = np.roll(m,(-t["x"],-t["y"]),(0,1))
         if t.get("rot"): m=np.rot90(m,4-t["rot"])
-        if t.get("flip"): m=np.fliplr(m)
+        if t.get("flip"): m=np.flipud(m)
         return m
         """
         if t.get("rot",0)%2 == 0:
@@ -176,7 +181,7 @@ class _AligningMixin(object):
         for rot_ in rot:
           for flip in set([False, self.allowFlip]):
             m = unaligned.copy()
-            if flip: m = np.fliplr(m)
+            if flip: m = np.flipud(m)
             if rot_ != 0: m = np.rot90(m,rot_)
             if not self.checkUnaligned(m): continue
             for x in range(m.shape[0]):
@@ -494,7 +499,7 @@ class Pattern4(_AbstractPattern):
         and all([bool(int(s%2)) for s in np.sum(m[1:,:],axis=1)])
         and np.sum(m[1:4,8])==0 and np.sum(m[1:3,9:11])==0
     )
-    return bool(r)
+    return bool(r) and int(self.decodeItem(aligned, "minutes")) < 60
   
   def decodeItem(self, aligned, name):
     rows = self.format[name]
@@ -571,6 +576,8 @@ class TDM(_AligningMixin):
     
     hps = property(lambda self:self.n_i*self.d_i)
     vps = property(lambda self:self.n_j*self.d_j)
+    hps_prototype = property(lambda self:self.n_i_prototype*self.d_i)
+    vps_prototype = property(lambda self:self.n_j_prototype*self.d_j)
 
     def __init__(self, pattern, aligned=None, trans=None, atX=-1, atY=-1):
         """
