@@ -289,8 +289,9 @@ class AnonmaskApplierCommon(object):
     """
     colour = YELLOW
     pagesize = CALIBRATIONPAGE_SIZE
+    dotRadius=0.004
 
-    def __init__(self, proto, hps, vps, dotRadius=0.004, xoffset=0, 
+    def __init__(self, proto, hps, vps, dotRadius=None, xoffset=0, 
                 yoffset=0, debug=False, scale=1):
         self.hps = hps
         self.vps = vps
@@ -301,7 +302,7 @@ class AnonmaskApplierCommon(object):
         self.proto = [
             ((xDot+self.xOffset)%self.hps, (yDot+self.yOffset)%self.vps)
             for xDot, yDot in proto]
-        self.dotRadius = dotRadius
+        if dotRadius: self.dotRadius = dotRadius
         if debug: self.colour = MAGENTA
 
     def apply(self, inPdf):
@@ -420,7 +421,8 @@ class AnonmaskApplierCommon(object):
 
 class AnonmaskApplierJson(AnonmaskApplierCommon):
 
-    def __init__(self, mask, **xargs):
+    def __init__(self, mask, dotRadius=None, xoffset=None, 
+                yoffset=None, debug=False, scale=None):
         d = json.loads(mask)
         if d.get("format_ver",0) < MASK_VERSION:
             raise Exception("Incompatible format version by mask. "
@@ -429,10 +431,12 @@ class AnonmaskApplierJson(AnonmaskApplierCommon):
         self.pagesize = d["pagesize"]
         super(AnonmaskApplierJson,self).__init__(
             d["proto"], d["hps"], d["vps"],
-            xoffset = xargs.pop("xoffset",None) or d["x_offset"],
-            yoffset = xargs.pop("yoffset",None) or d["y_offset"],
-            scale = xargs.pop("scale",None) or d["scale"],
-            **xargs)
+            dotRadius = dotRadius,
+            xoffset = xoffset or d["x_offset"],
+            yoffset = yoffset or d["y_offset"],
+            debug=debug,
+            scale = scale or d["scale"],
+        )
 
 
 AnonmaskApplier = AnonmaskApplierJson
