@@ -84,7 +84,7 @@ Set up your scan program so that it does not eliminate the paper structure nor t
 
 ##### My printer does not print tracking dots. Can I hide this fact?
 
-If there are really no tracking dots, you can print the calibration page (`deda_anonmask_create -w`) with another printer and use the mask for your own one. You can use the anonymised version of the tracking dots or just copy them (`deda_anonmask_create --copy`). See chapter "Anonymise a document for printing".
+If there are really no tracking dots, you can either use our example scans (make_examples.py) or print the calibration page (`deda_anonmask_create -w`) with another printer and use the mask for your own one. You can use the anonymised version of the tracking dots or just copy them (`deda_anonmask_create --copy`). See chapter "Anonymise a document for printing".
 
 
 ##### Install Error: command 'x86_64-linux-gnu-gcc' failed with exit status 1
