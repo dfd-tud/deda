@@ -8,7 +8,7 @@ from libdeda.pattern_handler import Pattern4, TDM
 from libdeda.privacy import AnonmaskApplierTdm
 from libdeda.print_parser import PrintParser
 
-tdm = Pattern4(trans=dict(rot=1))
+tdm = TDM(Pattern4,trans=dict(rot=1))
 tdm["serial"] = 123456
 tdm["manufacturer"] = "Epson"
 tdm["hour"] = 11
@@ -16,7 +16,6 @@ tdm["minutes"] = 11
 tdm["day"] = 11
 tdm["month"] = 11
 tdm["year"] = 18
-tdm = TDM(tdm)
 print(tdm)
 print(tdm.decode())
 assert(tdm.check() == True)

@@ -229,7 +229,6 @@ class AnonmaskCreator(object):
         print("\t%d valid matrices"%len(tdms))
         
         # select tdm
-        #"""
         # tdms := [closest TDM at edge \forall edge \in Edges]
         # |tdms| = |Edges|
         #pp.tdm = random.choice(tdms)
@@ -240,47 +239,25 @@ class AnonmaskCreator(object):
             tdms[np.argmin(
                 [abs(e1-tdm.atX)+abs(e2-tdm.atY) for tdm in tdms]
             )] for e1, e2 in edges]
-        #"""
         
         print("\tTracking dots pattern found:")
-        print("\tx=%d, y=%d, trans=%s"%(pp.tdm.atX,pp.tdm.atY,pp.tdm.trans))
+        print("\tx=%f, y=%f, trans=%s"%(pp.tdm.atX,pp.tdm.atY,pp.tdm.trans))
 
-        di = pp.pattern.d_i
-        dj = pp.pattern.d_j
-
-        # set correct hps,vps for offset patterns
-        hps2 = di*pp.pattern.n_i_prototype
-        vps2 = dj*pp.pattern.n_j_prototype
+        xOffsets = [tdm.xoffset for tdm in tdms]
+        yOffsets = [tdm.yoffset for tdm in tdms]
+        xOffset = circmean(xOffsets, high=pp.tdm.n_i_prototype*pp.tdm.d_i)
+        yOffset = circmean(yOffsets, high=pp.tdm.n_j_prototype*pp.tdm.d_j)
         
-        # Calc xOffset and yOffset: Distance from (0,0) to the first marking
-        # dots
-        #xOffset = (pp.tdm.atX/pp.yd.imgDpi-pp.tdm.trans["x"]*di)%hps2
-        #yOffset = (pp.tdm.atY/pp.yd.imgDpi-pp.tdm.trans["y"]*dj)%vps2
-        
-        xOffsets = [(tdm.atX/pp.yd.imgDpi-tdm.trans["x"]*di)%hps2
+        """
+        hps2 = pp.tdm.pattern.d_i*pp.tdm.pattern.n_i_prototype
+        vps2 = pp.tdm.pattern.d_j*pp.tdm.pattern.n_j_prototype
+        xOffsets = [(tdm.atX/pp.yd.imgDpi-tdm.trans["x"]*pp.tdm.pattern.d_i)%hps2
             for tdm in tdms]
         xOffset = circmean(xOffsets, high=hps2)
-        yOffsets = [(tdm.atY/pp.yd.imgDpi-tdm.trans["y"]*dj)%vps2
+        yOffsets = [(tdm.atY/pp.yd.imgDpi-tdm.trans["y"]*pp.tdm.pattern.d_j)%vps2
             for tdm in tdms]
-        yOffset = circmean(yOffsets, high=vps2)
-        
-        #self.im = rotateImage(self.im, -pp.yd.rotation)
-        #print("Rotating by %f°"%-pp.yd.rotation)
-        
-        # find scan margin dx, dy and subtract from offset
         """
-        dd = [((markerScanx/pp.yd.imgDpi-markerx/self.scaling), 
-                (markerScany/pp.yd.imgDpi-markery/self.scaling))
-            for (markerScanx,markerScany),(markerx,markery) 
-            in zip(self._getMagentaMarkers(),CALIBRATION_MARKERS)]
-        dx = np.average([x for x,y in dd])
-        dy = np.average([y for x,y in dd])
-        xOffset = (xOffset-dx*self.scaling)%hps2
-        yOffset = (yOffset-dy*self.scaling)%vps2
-        #"""
-        
-        if pp.tdm.trans["rot"]%2 == 1:
-            xOffset, yOffset = yOffset, xOffset
+
         print("TDM offset: %f, %f"%(xOffset,yOffset))
         
         return pp.tdm, xOffset, yOffset
@@ -290,34 +267,14 @@ class AnonmaskCreator(object):
         """
         Create a mask prototype
         """
-        pattern = tdm
-        di = pattern.d_i
-        dj = pattern.d_j
-        #di = self.scaling*di
-        #dj = self.scaling*dj
-        #tdm = tdm
-        #tdms = sorted(tdms,key=lambda e:e.atY+e.atX)
-        """
-        dots_references = [(x*di+tdm.atX/pp.yd.imgDpi, y*dj+tdm.atY/pp.yd.imgDpi)
-            for tdm in tdms
-            for m in [tdm.undoTransformation()]
-            for x in range(m.shape[0]) for y in range(m.shape[1])
-            if m[x,y] == 1]
-        im = np.zeros(self.im.shape)
-        for x,y in dots_references:
-            im[int(y*self.dpi),int(x*self.dpi)] = 255
-        cv2.imwrite("perspective_layer.png", im)
-        """
-        
         # create mask
         tdm = tdm if copy else tdm.createMask()
         #m = tdm.aligned
-        m, hps, vps = tdm.undoTransformation()
-        #m = np.roll(m,(tdm.trans["x"],tdm.trans["y"]),(0,1))
-        dots_proto = [((x*di), (y*dj))
+        m = tdm.undoTransformation()
+        dots_proto = [((x*tdm.d_i), (y*tdm.d_j))
             for x in range(m.shape[0]) for y in range(m.shape[1]) 
             if m[x,y] == 1]
-        return dots_proto, hps, vps
+        return dots_proto, tdm.hps, tdm.vps
         
 
 def calibrationScan2Anonmask(imbin, copy=False):

@@ -97,56 +97,68 @@ class _PatternInstantiationMixin(object):
         return mm
     
     def getAlignedTDMs(self, meta, unaligned):
-        cropx, cropy, gridx, gridy, cellx, celly, dcellx, dcelly = meta
-        x = cropx+gridx+cellx+dcellx
-        y = cropy+gridy+celly+dcelly
+        #cropx, cropy, gridx, gridy, cellx, celly, dcellx, dcelly = meta
         for t in self._getTransformations(unaligned):
-            tdm = TDM(self.applyTransformation(unaligned,t), atX=x, atY=y)
-            tdm.meta_position = meta
+            aligned = self.applyTransformation(unaligned,t)
+            tdm = TDM(self, aligned, t)
+            meta_ = meta+(-t.pop("x")*tdm.d_i, -t.pop("y")*tdm.d_j)
+            #meta_ = meta
+            #cropx, cropy, gridx, gridy, cellx, celly, dcellx, dcelly, transx, transy = meta_
+            tdm.atX = sum(meta_[slice(0,len(meta_),2)])
+            tdm.atY = sum(meta_[slice(1,len(meta_),2)])
+            #assert(tdm.atY == cropy+gridy+celly+dcelly+transy)
+            tdm.meta_position = meta_
             yield tdm
 
 
-class _PatternAligningMixin(object):
+class _AligningMixin(object):
 
     def applyTransformation(self, unaligned, t):
         """ Align matrix @unaligned according to transformation @t """
+        assert(isinstance(self, _AbstractPattern))
         m = unaligned
         if t.get("flip"): m=np.fliplr(m)
         if t.get("rot"): m=np.rot90(m,t["rot"])
         m = np.roll(m,(t["x"],t["y"]),(0,1))
         m = m[0:self.n_i_prototype, 0:self.n_j_prototype]
-        return self(m,t)
+        return m
     
     def undoTransformation(self):
         """ Undo align matrix """
+        assert(isinstance(self, TDM))
         m = self.aligned
         t = self.trans
-        m2 = np.zeros((self.n_i, self.n_j),dtype=np.uint8)
+        n_i = self.pattern.n_i
+        n_j = self.pattern.n_j
+        m2 = np.zeros((n_i, n_j),dtype=np.uint8)
         for x in range(m.shape[0]):
             for y in range(m.shape[1]):
                 for rx,ry in self.repetitions+[(0,0)]:
-                    m2[(rx+x)%self.n_i, (ry+y)%self.n_j] = m[x,y]
+                    m2[(rx+x)%n_i, (ry+y)%n_j] = m[x,y]
         m = m2
-        #m = np.roll(m,(-d["x"],-d["y"]),(0,1))
+        if "x" in t: m = np.roll(m,(-t["x"],-t["y"]),(0,1))
         if t.get("rot"): m=np.rot90(m,4-t["rot"])
         if t.get("flip"): m=np.fliplr(m)
+        return m
+        """
         if t.get("rot",0)%2 == 0:
             return m, self.hps, self.vps
         else:
             return m, self.vps, self.hps
+        """
         
     def _getTransformations(self,unaligned):
         """
         Get list of possible geometrical transformations to align a matrix
         @unaligned numpy matrix,
-        @returns the list of the transformations that fit best @markers and 
+        @returns yields transformations dicts that fit best @markers and 
                 @empty. Format:
-            [dict(
+            dict(
                 x=int rolling_axis_0,
                 y=int rolling_axis_1,
                 rot=int rotated_x_times_90_deg,
                 flip=bool
-            )]
+            )
         """
         l = []
         rot = []
@@ -167,6 +179,14 @@ class _PatternAligningMixin(object):
             if flip: m = np.fliplr(m)
             if rot_ != 0: m = np.rot90(m,rot_)
             if not self.checkUnaligned(m): continue
+            for x in range(m.shape[0]):
+                for y in range(m.shape[1]):
+                    if all([m[(dotx+x)%m.shape[0],(doty+y)%m.shape[1]] 
+                                for dotx,doty in self.markers]) \
+                    and not any([m[(dotx+x)%m.shape[0],(doty+y)%m.shape[1]] 
+                                for dotx,doty in self.empty]):
+                        yield dict(x=-x,y=-y,rot=rot_,flip=flip)
+        """
             dd = [dict(x=-x,y=-y,rot=rot_,flip=flip)
                 for x in range(m.shape[0])
                 for y in range(m.shape[1])
@@ -174,15 +194,15 @@ class _PatternAligningMixin(object):
             ]
             l.extend(dd)
         return l
+        """
         
 
 class _AbstractPattern(_PatternInstantiationMixin, _PatternInterface,
-                       _PatternAligningMixin, metaclass=_SetPatternId):
+                       _AligningMixin, metaclass=_SetPatternId):
     """
     Abstract pattern class
     Child classes represent patterns and must provide a full 
     PatternInterface. 
-    A class represents a pattern, an object represents a TDM.
     """
 
     # Size
@@ -213,15 +233,6 @@ class _AbstractPattern(_PatternInstantiationMixin, _PatternInterface,
     hps = property(lambda self:self.n_i*self.d_i)
     vps = property(lambda self:self.n_j*self.d_j)
     
-    def __init__(self, m=None, trans=None):
-        self.trans = trans or {}
-        dtype = np.uint8
-        shape = (self.n_i_prototype, self.n_j_prototype)
-        self.aligned = np.zeros(shape, dtype)
-        for x,y in self.markers: self.aligned[x,y] = 1
-        if m is not None:
-            for x,y in self.codebits: self.aligned[x,y] = m[x,y]
-    
     def __call__(self, *args, **xargs):
         """ Create a new instance, object acts as class constructor """
         return self.__class__(*args,**xargs)
@@ -235,10 +246,7 @@ class _AbstractPattern(_PatternInstantiationMixin, _PatternInterface,
         return self.__class__.__name__.replace("Pattern","")
     
     def __hash__(self):
-        return hash("%s%s"%(
-            self.__class__.__name__,
-            "".join([str(int(x)) for x in self.aligned.flat]))
-        )
+        return hash(self.__class__.__name__)
         
     def __eq__(self, o):
         return hash(self) == hash(o)
@@ -271,8 +279,8 @@ class _Pattern1(_AbstractPattern):
   def codebits(self):
     return [(c,r) for c in self.C for r in self.R]
   
-  def checkUnaligned(self,m):
-    dots = np.sum(m,axis=0)
+  def checkUnaligned(self,unaligned):
+    dots = np.sum(unaligned,axis=0)
     return 2 in dots and sum([1 for s in dots if s%2==0]) >= 8
     #return 2 in dots and all([s%2==0 for s in dots])
 
@@ -488,21 +496,21 @@ class Pattern4(_AbstractPattern):
     )
     return bool(r)
   
-  def __getitem__(self, name): # decoding feature
+  def decodeItem(self, aligned, name):
     rows = self.format[name]
     if not isinstance(rows,tuple): rows = (rows,)
-    decoded = "".join(["%02d"%int(array2str(self.aligned[1:,row]),2) 
+    decoded = "".join(["%02d"%int(array2str(aligned[1:,row]),2) 
         for row in rows])
     if name == "manufacturer":
         if decoded.isdigit() and int(decoded) in self.manufacturers: 
             return self.manufacturers.get(int(decoded))
         else: return "Xerox/Dell/Epson"
     elif name == "serial":
-        if self["manufacturer"] == "Dell": return None
+        if self.decodeItem(aligned,"manufacturer") == "Dell": return None
         else: return "-%s-"%decoded
     else: return decoded
   
-  def __setitem__(self, name, value): # decoding feature
+  def encodeItem(self, aligned, name, value):
     value = str(value)
     if name == "serial": value = value.replace("-","")
     if name == "manufacturer" and not value.isdigit():
@@ -521,13 +529,13 @@ class Pattern4(_AbstractPattern):
         valbin = list(map(int, bin(int(v))[2:]))
         while len(valbin) < 8: valbin = [0]+valbin # fill 
         #valbin[0] = 1-np.sum(valbin)%2 # parity
-        self.aligned[:,row] = valbin
-    self.aligned[:,15] = 1-np.sum(self.aligned[:,1:15],axis=1)%2 # v parity
-    self.aligned[0,1:] = 1-np.sum(self.aligned[1:8,1:],axis=0)%2 # h parity
-    #self.aligned[0,15] = 1-np.sum(self.aligned[1:8,15])%2
+        aligned[:,row] = valbin
+    aligned[:,15] = 1-np.sum(aligned[:,1:15],axis=1)%2 # v parity
+    aligned[0,1:] = 1-np.sum(aligned[1:8,1:],axis=0)%2 # h parity
+    #aligned[0,15] = 1-np.sum(aligned[1:8,15])%2
     
   def decode(self,aligned):
-    d = {k:self[k] for k in self.format.keys()}
+    d = {k:self.decodeItem(aligned,k) for k in self.format.keys()}
     centuries = np.array([2000,1900])
     century = centuries[np.argmin(np.abs(centuries+int(d["year"])-2018))]
     d["timestamp"] = datetime.datetime(
@@ -556,44 +564,75 @@ patterns = {cls.pid:cls()
     if name.startswith("Pattern")}
 
 
-class TDM(object):
+class TDM(_AligningMixin):
     """
-    An aligned Tracking Dots Matrix. Decorating descendants from
-    AbstractPattern
+    An aligned Tracking Dots Matrix. Decorating patterns
     """
     
-    def __init__(self, pattern, atX=-1, atY=-1):
+    hps = property(lambda self:self.n_i*self.d_i)
+    vps = property(lambda self:self.n_j*self.d_j)
+
+    def __init__(self, pattern, aligned=None, trans=None, atX=-1, atY=-1):
         """
         pattern _PatternInterface pattern object,
-        atX int position on paper in pixels,
+        atX int pattern edge position on paper in inches,
         atY int,
         """
-        self.pattern = pattern
-        self.aligned = pattern.aligned
+        self.pattern = pattern()
         self.atX = atX
         self.atY = atY
-        
+        self.trans = trans or {}
+        dtype = np.uint8
+        shape = (self.pattern.n_i_prototype, self.pattern.n_j_prototype)
+        self.aligned = np.zeros(shape, dtype)
+        for x,y in self.markers: self.aligned[x,y] = 1
+        if aligned is not None:
+            for x,y in self.pattern.codebits: 
+                self.aligned[x,y] = aligned[x,y]
+    
+    @property
+    def rotated(self): return self.trans.get("rot",0)%2==1
+    
+    @property
+    def xoffset(self): return self.atX%(self.n_i_prototype*self.d_i)
+
+    @property
+    def yoffset(self): return self.atY%(self.n_j_prototype*self.d_j)
+    
     def __getattr__(self, name):
+        """
+        d_i, d_j, n_i and n_j refer to the unaligned matrix
+        """
+        if self.rotated and name[0:3] in ("d_i","d_j","n_i","n_j"):
+            name = "%s%s%s"%(name[0:2], "j" if name[2] == "i" else "i", 
+                name[3:])
         return getattr(self.pattern,name)
+    
+    def __getitem__(self, name):
+        return self.pattern.decodeItem(self.aligned, name)
         
-    def decode(self):
-        return self.pattern.decode(self.aligned)
+    def __setitem__(self, name, val):
+        return self.pattern.encodeItem(self.aligned, name, val)
         
-    def check(self):
-        return self.pattern.check(self.aligned)
-        
+    def check(self): return self.pattern.check(self.aligned)
+
+    def decode(self): return self.pattern.decode(self.aligned)
+
     def createMask(self, addTdm=True):
         mask = self.pattern.createMask(self.aligned)
         if addTdm: mask = np.array((self.aligned+mask)>0,dtype=np.uint8)
         return TDM(
             atX=self.atX,atY=self.atY,
-            pattern=self.pattern(mask,self.pattern.trans))
+            pattern=self.pattern,aligned=mask,trans=self.trans)
         
     def __str__(self):
         return matrix2str(self.aligned)
     
     def __hash__(self):
-        return hash(self.pattern)
+        return hash("%d%s"%(
+            hash(self.pattern),
+            "".join([str(int(x)) for x in self.aligned.flat]))
+        )
         
     def __eq__(self, o):
         return hash(self) == hash(o)

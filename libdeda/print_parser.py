@@ -161,6 +161,7 @@ class PrintParser(object):
   def _getTdms(self, p):
     for meta, m in p.getAllMatricesFromYDX(self.yd):
         meta += self._get_dxy(p, meta)
+        meta = tuple([e/self.yd.imgDpi for e in list(meta)])
         for tdm in p.getAlignedTDMs(meta,m): yield tdm
     
   def getAllValidTdms(self):
