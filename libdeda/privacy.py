@@ -100,7 +100,7 @@ class AnonmaskCreator(object):
             sys.stderr.write("Warning: Cannot determine dpi of input. "
                 +"Assuming %f dpi.\n"%self.dpi)
 
-    def __call__(self, *args, **xargs):
+    def __call__(self, copy):
         self.restoreOrientation()
         self.restoreSkewByDots()
         #self.restoreSkewByMarkers()
@@ -108,7 +108,8 @@ class AnonmaskCreator(object):
         self.getPageScaling()
         self.restorePerspective()
         tdm, xOffset, yOffset = self.readTDM()
-        dots_proto, hps, vps = self.tdm2mask(tdm, *args, **xargs)
+        tdm = tdm if copy else tdm.masked
+        dots_proto, hps, vps = self.tdm2coordinates(tdm, *args, **xargs)
         maskdata = dict(
             proto=dots_proto, hps=hps, vps=vps, x_offset=xOffset,
             y_offset=yOffset, pagesize=CALIBRATIONPAGE_SIZE, 
@@ -247,27 +248,15 @@ class AnonmaskCreator(object):
         yOffsets = [tdm.yoffset for tdm in tdms]
         xOffset = circmean(xOffsets, high=pp.tdm.hps_prototype)
         yOffset = circmean(yOffsets, high=pp.tdm.vps_prototype)
-        """
-        hps2 = pp.tdm.pattern.d_i*pp.tdm.pattern.n_i_prototype
-        vps2 = pp.tdm.pattern.d_j*pp.tdm.pattern.n_j_prototype
-        xOffsets = [(tdm.atX/pp.yd.imgDpi-tdm.trans["x"]*pp.tdm.pattern.d_i)%hps2
-            for tdm in tdms]
-        xOffset = circmean(xOffsets, high=hps2)
-        yOffsets = [(tdm.atY/pp.yd.imgDpi-tdm.trans["y"]*pp.tdm.pattern.d_j)%vps2
-            for tdm in tdms]
-        """
-
         print("TDM offset: %f, %f"%(xOffset,yOffset))
         
         return pp.tdm, xOffset, yOffset
 
     @classmethod
-    def tdm2mask(self, tdm, copy):
+    def tdm2coordinates(self, tdm):
         """
-        Create a mask prototype
+        Create a mask prototype as inch coordinates
         """
-        # create mask
-        tdm = tdm if copy else tdm.createMask()
         #m = tdm.aligned
         m = tdm.undoTransformation()
         dots_proto = [((x*tdm.d_i), (y*tdm.d_j))
@@ -444,9 +433,9 @@ AnonmaskApplier = AnonmaskApplierJson
 class AnonmaskApplierTdm(AnonmaskApplierCommon):
     """ TDM to PDF """
     
-    def __init__(self, tdm, copy=True, **xargs):
+    def __init__(self, tdm, **xargs):
         super(AnonmaskApplierTdm,self).__init__(
-            *AnonmaskCreator.tdm2mask(tdm, copy), **xargs)
+            *AnonmaskCreator.tdm2coordinates(tdm), **xargs)
 
 
 class ScanCleaner(ImgProcessingMixin):
