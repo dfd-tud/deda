@@ -85,10 +85,11 @@ class AnonmaskCreator(object):
     that can be applied on pages of any size by AnonmaskApplier
     """
 
-    def __init__(self,imbin):
+    def __init__(self,imbin,verbose=False):
         """
         @imbin: Image binary of scanned calibration page image
         """
+        self._verbose = verbose
         file_bytes = np.asarray(bytearray(imbin), dtype=np.uint8)
         self.im = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
         try:
@@ -109,12 +110,16 @@ class AnonmaskCreator(object):
         self.restorePerspective()
         tdm, xOffset, yOffset = self.readTDM()
         tdm = tdm if copy else tdm.masked
-        dots_proto, hps, vps = self.tdm2coordinates(tdm, *args, **xargs)
+        dots_proto, hps, vps = self.tdm2coordinates(tdm)
         maskdata = dict(
             proto=dots_proto, hps=hps, vps=vps, x_offset=xOffset,
             y_offset=yOffset, pagesize=CALIBRATIONPAGE_SIZE, 
             scale=self.scaling, format_ver=MASK_VERSION)
         return json.dumps(maskdata).encode("ascii")
+        
+    def _print(self, s):
+        if not self._verbose: return
+        sys.stderr.write("%s\n"%s)
         
     @property
     def centre(self):
@@ -148,7 +153,7 @@ class AnonmaskCreator(object):
         dot = np.min(cEdges[:,0]), np.min(cEdges[:,1])
         angles = {False: {False: 3, True: 0}, True: {False: 2, True: 1}}
         angle = angles[dot[0]>self.centre[0]][dot[1]>self.centre[1]]
-        print("Orientation correction: rotating input by %d°"%(angle*90))
+        self._print("Orientation correction: rotating input by %d°"%(angle*90))
         self.im = np.rot90(self.im, angle)
     
     def _getMagentaMarkers(self):
@@ -173,14 +178,14 @@ class AnonmaskCreator(object):
     def restoreSkewByMarkers(self):
         _,_, angle = cv2.minAreaRect(self._getMagentaMarkers())
         angle = angle%90 if angle%90<45 else angle%90-90
-        print("Skew correction: rotating by %+f°"%angle)
+        self._print("Skew correction: rotating by %+f°"%angle)
         self.im = rotateImage(self.im, angle, cv2.INTER_NEAREST)
     
     def restoreSkewByDots(self):
         pp = PrintParser(self.im,ydxArgs=dict(
             inputDpi=self.dpi,interpolation=cv2.INTER_NEAREST))
         self.im = rotateImage(self.im, -pp.yd.rotation)
-        print("Rotating by %f°"%-pp.yd.rotation)
+        self._print("Rotating by %f°"%-pp.yd.rotation)
         
     def getPageScaling(self):
         dist = lambda p1,p2:(abs(p1[0]-p2[0])**2+abs(p1[1]-p2[1])**2)**.5
@@ -197,7 +202,7 @@ class AnonmaskCreator(object):
             sys.stderr.write(
                 "WARNING: Your print has probably been resized. For "    
                 "better results disable page scaling.\n")
-            print("Scaling factor: %f theoretical inches = 1 inch on paper"
+            self._print("Scaling factor: %f theoretical inches = 1 inch on paper"
                 %self.scaling)
             
     def restorePerspective(self):
@@ -205,9 +210,9 @@ class AnonmaskCreator(object):
         outputPoints = np.array([(x*self.dpi, y*self.dpi) 
             for x,y in CALIBRATION_MARKERS],dtype=np.float32)
         l = cv2.getPerspectiveTransform(inputPoints,outputPoints)
-        print("Perspective Transform")
+        self._print("Perspective Transform")
         for (x1,y1),(x2,y2) in zip(inputPoints,outputPoints):
-            print("\tMapping %d,%d -> %d,%d"%(x1,y1,x2,y2))
+            self._print("\tMapping %d,%d -> %d,%d"%(x1,y1,x2,y2))
         testpageSizePx = (
             int(CALIBRATIONPAGE_SIZE[0]/72*self.dpi), int(CALIBRATIONPAGE_SIZE[1]/72*self.dpi))
         self.im = cv2.warpPerspective(self.im,l,testpageSizePx,
@@ -220,14 +225,14 @@ class AnonmaskCreator(object):
         Extract TDM from scan 
         @returns: TDM, xOffset, yOffset
         """
-        print("Extracting tracking dots... ")
+        self._print("Extracting tracking dots... ")
         #cv2.imwrite("perspective.png",self.im)
         # get tracking dot matrices
         pp = PrintParser(self.im,ydxArgs=dict(
             inputDpi=self.dpi,interpolation=cv2.INTER_NEAREST,
             rotation=False))
         tdms = list(pp.getAllValidTdms())
-        print("\t%d valid matrices"%len(tdms))
+        self._print("\t%d valid matrices"%len(tdms))
         
         # select tdm
         # tdms := [closest TDM at edge \forall edge \in Edges]
@@ -241,14 +246,14 @@ class AnonmaskCreator(object):
                 [abs(e1-tdm.atX)+abs(e2-tdm.atY) for tdm in tdms]
             )] for e1, e2 in edges]
         
-        print("\tTracking dots pattern found:")
-        print("\tx=%f, y=%f, trans=%s"%(pp.tdm.atX,pp.tdm.atY,pp.tdm.trans))
+        self._print("\tTracking dots pattern found:")
+        self._print("\tx=%f, y=%f, trans=%s"%(pp.tdm.atX,pp.tdm.atY,pp.tdm.trans))
 
         xOffsets = [tdm.xoffset for tdm in tdms]
         yOffsets = [tdm.yoffset for tdm in tdms]
         xOffset = circmean(xOffsets, high=pp.tdm.hps_prototype)
         yOffset = circmean(yOffsets, high=pp.tdm.vps_prototype)
-        print("TDM offset: %f, %f"%(xOffset,yOffset))
+        self._print("TDM offset: %f, %f"%(xOffset,yOffset))
         
         return pp.tdm, xOffset, yOffset
 
@@ -265,8 +270,8 @@ class AnonmaskCreator(object):
         return dots_proto, tdm.hps, tdm.vps
         
 
-def calibrationScan2Anonmask(imbin, copy=False):
-    return AnonmaskCreator(imbin)(copy)
+def calibrationScan2Anonmask(imbin, copy=False, verbose=False):
+    return AnonmaskCreator(imbin,verbose)(copy)
     
 
 class AnonmaskApplierCommon(object):
@@ -446,7 +451,7 @@ class ScanCleaner(ImgProcessingMixin):
     def __init__(self, imbin, *args, **xargs):
         file_bytes = np.asarray(bytearray(imbin), dtype=np.uint8)
         self.im = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-        super(ScanCleaner, self).__init__(BytesIO(imbin), *args, **xargs)
+        super(ScanCleaner, self).__init__(imbin, *args, **xargs)
     
     def __call__(self, grayscale=False, outformat=".png"):
         _, mask = self.processImage(self.im,workAtDpi=None,halftonesBlur=10,
