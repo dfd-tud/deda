@@ -504,11 +504,11 @@ class Pattern4(_AbstractPattern):
 
   def check(self,aligned):
     m = aligned[0:8,1:16]
-    r = (all([bool(int(s%2)) for s in np.sum(m[:,:14],axis=0)])
+    r = bool(all([bool(int(s%2)) for s in np.sum(m[:,:14],axis=0)])
         and all([bool(int(s%2)) for s in np.sum(m[1:,:],axis=1)])
         and np.sum(m[1:4,8])==0 and np.sum(m[1:3,9:11])==0
     )
-    return bool(r) and int(self.decodeItem(aligned, "minutes")) < 60
+    return r
   
   def decodeItem(self, aligned, name):
     rows = self.format[name]
@@ -630,7 +630,8 @@ class TDM(_AligningMixin):
         if aligned is not None:
             for x,y in self.pattern.codebits: 
                 self.aligned[x,y] = aligned[x,y]
-        for k, v in content.items(): self.__setitem__(k,v)
+        if content is not None: 
+            for k, v in content.items(): self.__setitem__(k,v)
     
     def __getitem__(self, name):
         return self.pattern.decodeItem(self.aligned, name)
