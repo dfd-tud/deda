@@ -82,7 +82,9 @@ Note that if DOCUMENT.PDF contains graphics with white or light coloured parts, 
 
 ##### deda_parse_print: command not found
 
-Execute
+Possible solutions:
+* Install deda accordig to chapter 0
+* Execute
 `$ export PATH="$PATH:$(python -c 'import site,os; print(os.path.join(site.USER_BASE, "bin"))')"`
 
 
@@ -93,7 +95,7 @@ Set up your scan program so that it does not eliminate the paper structure nor t
 
 ##### My printer does not print tracking dots. Can I hide this fact?
 
-If there are really no tracking dots, you can either create your own ones (`deda_create_dots`) or print the calibration page (`deda_anonmask_create -w`) with another printer and use the mask for your own one. You can use the anonymised version of the tracking dots or just copy them (`deda_anonmask_create --copy`). See chapter "Anonymise a document for printing".
+If there are really no tracking dots, you can either create your own ones (`deda_create_dots`) or print the calibration page (`deda_anonmask_create -w`) with another printer and use the mask for your own printer. You can use the anonymised version of the tracking dots or just copy them (`deda_anonmask_create --copy`). See chapters "Anonymise a document for printing" and "Create your own tracking dots".
 
 
 ##### Install Error: command 'x86_64-linux-gnu-gcc' failed with exit status 1
