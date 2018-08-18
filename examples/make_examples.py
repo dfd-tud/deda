@@ -9,23 +9,22 @@ from libdeda.privacy import AnonmaskApplierTdm, AnonmaskApplier, \
                             createCalibrationpage, calibrationScan2Anonmask
 from libdeda.print_parser import PrintParser
 
+
 calibrationPage = createCalibrationpage()
 
-tdm = TDM(Pattern4,trans=dict(rot=3,flip=True),content=dict(
-    serial = 123456
-    manufacturer = "Epson"
-    hour = 11
-    minutes = 11
-    day = 11
+tdm = TDM(Pattern4,content=dict(
+    serial = 123456,
+    manufacturer = "Epson",
+    hour = 11,
+    minutes = 11,
+    day = 11,
     month = 11,
-    year = 18
+    year = 18,
 ))
 print(tdm)
 print(tdm.decode())
 
-xoffset, yoffset = tdm.hps_prototype/2, tdm.vps_prototype/2
-#print(xoffset, yoffset)
-aa = AnonmaskApplierTdm(tdm,xoffset=xoffset,yoffset=yoffset)
+aa = AnonmaskApplierTdm(tdm)
 calibrationPageDotsPdf = aa.apply(calibrationPage)
 with WandImage(file=BytesIO(calibrationPageDotsPdf),format="pdf",
                resolution=300) as wim:
