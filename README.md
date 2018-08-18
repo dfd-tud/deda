@@ -39,13 +39,22 @@ for further analysis.
 `$ deda_extract_yd INPUTFILE`
 
 
-#### 4. Anonymise a scanned image
+#### 4. Create your own tracking dots
+
+If you want to create your own tracking dots matrix and add it to a pdf
+document, pass the contents as parameters (see `deda_create_dots -h`).
+`$ deda_create_dots PDFINPUT`
+
+The calibration page (`$ deda_anonmask_create -w`) may be used as an input.
+
+
+#### 5. Anonymise a scanned image
 
 This (mostly) removes tracking data from a scan:   
 `$ deda_clean_document INPUTFILE OUTPUTFILE`
 
 
-#### 5. Anonymise a document for printing
+#### 6. Anonymise a document for printing
 
 * Save your document as a PDF file and call it DOCUMENT.PDF.
 
@@ -84,7 +93,7 @@ Set up your scan program so that it does not eliminate the paper structure nor t
 
 ##### My printer does not print tracking dots. Can I hide this fact?
 
-If there are really no tracking dots, you can either use our example scans (make_examples.py) or print the calibration page (`deda_anonmask_create -w`) with another printer and use the mask for your own one. You can use the anonymised version of the tracking dots or just copy them (`deda_anonmask_create --copy`). See chapter "Anonymise a document for printing".
+If there are really no tracking dots, you can either create your own ones (`deda_create_dots`) or print the calibration page (`deda_anonmask_create -w`) with another printer and use the mask for your own one. You can use the anonymised version of the tracking dots or just copy them (`deda_anonmask_create --copy`). See chapter "Anonymise a document for printing".
 
 
 ##### Install Error: command 'x86_64-linux-gnu-gcc' failed with exit status 1
