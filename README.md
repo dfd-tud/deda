@@ -78,7 +78,7 @@ passed to `deda_anonmask_apply` as parameters.
 Note that if DOCUMENT.PDF contains graphics with white or light coloured parts, these can only be masked if "wand" is installed (see above).
 
 
-#### 6. Troubleshooting
+#### 7. Troubleshooting
 
 ##### deda_parse_print: command not found
 
