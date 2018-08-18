@@ -36,7 +36,7 @@ Tracking data can be read and sometimes be decoded from a scanned image. For goo
 
 New patterns might not be recognised by parse_print. The dots can be extracted
 for further analysis.      
-`$ libdeda/extract_yd.py INPUTFILE`
+`$ deda_extract_yd INPUTFILE`
 
 
 #### 4. Anonymise a scanned image
