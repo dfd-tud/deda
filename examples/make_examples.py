@@ -11,14 +11,15 @@ from libdeda.print_parser import PrintParser
 
 calibrationPage = createCalibrationpage()
 
-tdm = TDM(Pattern4,trans=dict(rot=3,flip=True))
-tdm["serial"] = 123456
-tdm["manufacturer"] = "Epson"
-tdm["hour"] = 11
-tdm["minutes"] = 11
-tdm["day"] = 11
-tdm["month"] = 11
-tdm["year"] = 18
+tdm = TDM(Pattern4,trans=dict(rot=3,flip=True),content=dict(
+    serial = 123456
+    manufacturer = "Epson"
+    hour = 11
+    minutes = 11
+    day = 11
+    month = 11,
+    year = 18
+))
 print(tdm)
 print(tdm.decode())
 
