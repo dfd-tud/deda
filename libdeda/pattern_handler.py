@@ -148,7 +148,7 @@ class _AligningMixin(object):
         m2 = np.zeros((n_i, n_j),dtype=np.uint8)
         for x in range(m.shape[0]):
             for y in range(m.shape[1]):
-                for rx,ry in self.repetitions+[(0,0)]:
+                for rx,ry in self.pattern.repetitions+[(0,0)]:
                     m2[(rx+x)%n_i, (ry+y)%n_j] = m[x,y]
         m = m2
         if "x" in t: m = np.roll(m,(-t["x"],-t["y"]),(0,1))
@@ -626,7 +626,7 @@ class TDM(_AligningMixin):
         dtype = np.uint8
         shape = (self.pattern.n_i_prototype, self.pattern.n_j_prototype)
         self.aligned = np.zeros(shape, dtype)
-        for x,y in self.markers: self.aligned[x,y] = 1
+        for x,y in self.pattern.markers: self.aligned[x,y] = 1
         if aligned is not None:
             for x,y in self.pattern.codebits: 
                 self.aligned[x,y] = aligned[x,y]
