@@ -42,7 +42,7 @@ class _PatternInterface(object):
         a pattern can be excluded without completely aligning it.
         Output: bool
         """
-        pass
+        raise NotImplementedError()
 
     def check(self,aligned): 
         """
@@ -50,7 +50,7 @@ class _PatternInterface(object):
         Input: aligned matrix
         Output: bool
         """
-        pass
+        raise NotImplementedError()
     
     def decode(self,aligned):
         """
@@ -58,8 +58,17 @@ class _PatternInterface(object):
         Input: aligned matrix
         Output: dict
         """
-        pass
+        raise NotImplementedError()
+    
+    def decodeItem(self, aligned, name):
+        """
+        Decode a single item
+        """
+        raise NotImplementedError()
         
+    def encodeItem(self, aligned, name, val):
+        raise NotImplementedError()
+    
     def createMask(self, aligned):
         """
         Returns anonymisation mask. United with @aligned it will contain
@@ -67,6 +76,7 @@ class _PatternInterface(object):
         Input: aligned matrix
         Output: matrix of same shape as aligned
         """
+        raise NotImplementedError()
         
 
 class _SetPatternId(type):
@@ -102,7 +112,7 @@ class _PatternInstantiationMixin(object):
             aligned = self.applyTransformation(unaligned,t)
             tdm = TDM(self, aligned, t)
             
-            # t --> tdm.atX, tdm.atY
+            # t+meta --> tdm.atX, tdm.atY
             x, y = t.pop("x"), t.pop("y")
             if tdm.rotated: x,y = y,x
             if t.get("rot") in (1,2): y = -y-tdm.n_j_prototype
@@ -145,12 +155,6 @@ class _AligningMixin(object):
         if t.get("rot"): m=np.rot90(m,4-t["rot"])
         if t.get("flip"): m=np.flipud(m)
         return m
-        """
-        if t.get("rot",0)%2 == 0:
-            return m, self.hps, self.vps
-        else:
-            return m, self.vps, self.hps
-        """
         
     def _getTransformations(self,unaligned):
         """
@@ -237,6 +241,8 @@ class _AbstractPattern(_PatternInstantiationMixin, _PatternInterface,
     
     hps = property(lambda self:self.n_i*self.d_i)
     vps = property(lambda self:self.n_j*self.d_j)
+    hps_prototype = property(lambda self:self.n_i_prototype*self.d_i)
+    vps_prototype = property(lambda self:self.n_j_prototype*self.d_j)
     
     def __call__(self, *args, **xargs):
         """ Create a new instance, object acts as class constructor """
@@ -258,6 +264,9 @@ class _AbstractPattern(_PatternInstantiationMixin, _PatternInterface,
 
     def checkUnaligned(self,unaligned):
         return True
+        
+    def decodeItem(self, aligned, name):
+        return self.decode(aligned)[name]
 
 
 class _Pattern1(_AbstractPattern):
@@ -574,17 +583,42 @@ class TDM(_AligningMixin):
     An aligned Tracking Dots Matrix. Decorating patterns
     """
     
-    hps = property(lambda self:self.n_i*self.d_i)
-    vps = property(lambda self:self.n_j*self.d_j)
-    hps_prototype = property(lambda self:self.n_i_prototype*self.d_i)
-    vps_prototype = property(lambda self:self.n_j_prototype*self.d_j)
+    d_i = property(lambda self:
+        self.pattern.d_j if self.rotated else self.pattern.d_i)
+    d_j = property(lambda self:
+        self.pattern.d_i if self.rotated else self.pattern.d_j)
+    n_i = property(lambda self:
+        self.pattern.n_j if self.rotated else self.pattern.n_i)
+    n_j = property(lambda self:
+        self.pattern.n_i if self.rotated else self.pattern.n_j)
+    n_i_prototype = property(lambda self: self.pattern.n_j_prototype 
+        if self.rotated else self.pattern.n_i_prototype)
+    n_j_prototype = property(lambda self: self.pattern.n_i_prototype 
+        if self.rotated else self.pattern.n_j_prototype)
+    hps = property(lambda self:
+        self.pattern.vps if self.rotated else self.pattern.hps)
+    vps = property(lambda self:
+        self.pattern.hps if self.rotated else self.pattern.vps)
+    hps_prototype = property(lambda self: self.pattern.vps_prototype 
+        if self.rotated else self.pattern.hps_prototype)
+    vps_prototype = property(lambda self: self.pattern.hps_prototype 
+        if self.rotated else self.pattern.vps_prototype)
+    masked = property(lambda self:self.createMask(True))
+    rotated = property(lambda self: self.trans.get("rot",0)%2==1)
+    xoffset = property(lambda self: self.atX%(self.n_i_prototype*self.d_i))
+    yoffset = property(lambda self: self.atY%(self.n_j_prototype*self.d_j))
 
-    def __init__(self, pattern, aligned=None, trans=None, atX=-1, atY=-1):
+    def __init__(self, pattern, aligned=None, trans=None, atX=-1, atY=-1,
+            content=None):
         """
         pattern _PatternInterface pattern object,
+        aligned np.array TDM matrix,
+        trans dict transformation dict by _getTransformations(),
         atX int pattern edge position on paper in inches,
         atY int,
+        content dict Decoded content to be set if aligned is None
         """
+        assert(aligned is None or content is None)
         self.pattern = pattern()
         self.atX = atX
         self.atY = atY
@@ -596,24 +630,7 @@ class TDM(_AligningMixin):
         if aligned is not None:
             for x,y in self.pattern.codebits: 
                 self.aligned[x,y] = aligned[x,y]
-    
-    @property
-    def rotated(self): return self.trans.get("rot",0)%2==1
-    
-    @property
-    def xoffset(self): return self.atX%(self.n_i_prototype*self.d_i)
-
-    @property
-    def yoffset(self): return self.atY%(self.n_j_prototype*self.d_j)
-    
-    def __getattr__(self, name):
-        """
-        d_i, d_j, n_i and n_j refer to the unaligned matrix
-        """
-        if self.rotated and name[0:3] in ("d_i","d_j","n_i","n_j"):
-            name = "%s%s%s"%(name[0:2], "j" if name[2] == "i" else "i", 
-                name[3:])
-        return getattr(self.pattern,name)
+        for k, v in content.items(): self.__setitem__(k,v)
     
     def __getitem__(self, name):
         return self.pattern.decodeItem(self.aligned, name)
