@@ -7,7 +7,6 @@ from wand.image import Image as WandImage
 from libdeda.pattern_handler import Pattern4, TDM
 from libdeda.privacy import AnonmaskApplierTdm, AnonmaskApplier, \
                             createCalibrationpage, calibrationScan2Anonmask
-from libdeda.print_parser import PrintParser
 
 
 calibrationPage = createCalibrationpage()
