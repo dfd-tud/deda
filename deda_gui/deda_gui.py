@@ -69,13 +69,13 @@ def main():
         result_matrix += '</tbody></table>'
 
         #create table with decoding results
-        dec = pp.tdm.decode()
+        dec = pp.tdm.decode() # keys: manufacturer, raw, serial, timestamp
         result_decoding = '<table class="table table-bordered table-sm table-hover" id="resulttable"><tbody>'
         result_decoding += '<tr><th scope="row">Analysed Image</th><td>' + os.path.split(imgfile)[1] + '</td></tr>'
         result_decoding += '<tr><th scope="row">Detected Pattern</th><td>' + str(result_pattern) + '</td></tr>'
 
-        for i in (dec.items()):
-            result_decoding += '<tr><th scope="row">' + i[0].title() + '</th><td>' + i[1] + '</td></tr>'
+        for key, val in dec.items():
+            result_decoding = '%s<tr><th scope="row">%s</th><td>%s</td></tr>'%(result_decoding, str(key).title(), val)
         result_decoding += '<tr><th scope="row">Dot Count per Pattern</th><td>' + countdots + '</td></tr></tbody></table>'
 
         #send results to javascript
