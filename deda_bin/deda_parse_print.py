@@ -53,8 +53,8 @@ class Main(object):
         tdm = pp.tdm
         if tdm is None: return
         print(tdm)
-        mask = tdm.createMask()
-        masked = np.array((tdm.aligned+mask.aligned)>0,dtype=np.uint8)
+        #mask = tdm.createMask()
+        #masked = np.array((tdm.aligned+mask.aligned)>0,dtype=np.uint8)
         #print(matrix2str(masked))
         #print(mask)
         print(repr(tdm))
