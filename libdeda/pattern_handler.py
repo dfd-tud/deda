@@ -572,43 +572,37 @@ class Pattern4(_AbstractPattern):
     return anon
 
 
-class Pattern5offset(_AbstractPattern):
+class Pattern5(_AbstractPattern):
 
     # Canon
     d_i = 0.02
-    d_j = 0.01
+    d_j = 0.01 # 0.006, 0.005, 0.02
     n_i = 16*2
     n_j = 16
     #n_i = 16*112
     #n_j = 16+7*112
     n_i_prototype = 16
     n_j_prototype = 16
-    markers = [(0,0),(0,4), (16,7),(16,7+4)]
+    markers = [(0,0),(0,4)]#, (16,7),(16,7+4) (16,0),(16,4)
     #repetitions = [(i*16,i*7) for i in range(1,112)]
+    #rot=[0]
+    allowUpsideDown = False
+    #allowRotation = False
+    #minCount=-1
 
+    def checkUnaligned(self, m):
+        return np.sum(m) == 2*18
+        
     def check(self, aligned):
-        return np.sum(aligned[0:self.n_i_prototype,0:self.n_j_prototype]==1) == 18
-        """
-            and np.sum(aligned[0,:]) == 2 
-            and np.sum(np.sum(aligned,axis=1)==2) == 2
-            and (np.sum(aligned,axis=0)<=2).all()
-            and (np.sum(aligned,axis=1)<=2).all()
-        """
+        return (np.sum(np.sum(aligned,axis=1)==2) == 2
+            and np.sum(np.sum(aligned,axis=1)==1) == 14
+            #and (np.sum(aligned,axis=1) >= 1).all()
+            #and (np.sum(aligned,axis=1)<=2).all()
+        )
         
     def decode(self, aligned):
         return dict(manufacturer="Canon",raw=array2str(aligned))
 
-
-class Pattern5(Pattern5offset):
-    
-    n_i = 32
-    n_j = 16
-    repetitions = [(16,0)]
-    markers = [(0,0),(0,4), (16,0),(16,4)]
-
-    def checkUnaligned(self, m):
-        return np.sum(m[0:self.n_i_prototype,0:self.n_j_prototype]==1) == 18
-        
 
 patterns = {name:cls()
     for name, cls in globals().items() 
@@ -698,7 +692,7 @@ class TDM(_AligningMixin):
         return hash(self) == hash(o)
     
     def __repr__(self):
-        return "<TDM of Pattern %s at %d x %d pixels>"%(
+        return "<TDM of Pattern %s at %0.2f x %0.2f inches>"%(
             self.pattern,self.atX,self.atY)
         
         
