@@ -2,105 +2,65 @@
 <html lang="de">
 
 <head>
+
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="">
+    <meta name="description" content="Forensische Analyse">
     <meta name="author" content="stephan escher">
 
     <title>Deda Toolkit</title>
 
-    <!-- CSS Import-->
+    <!-- CSS Import -->
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link href="../css/dedastyle.css" rel="stylesheet">
-    <link href="../css/fontawesome-all.css" rel="stylesheet">
+    <link href="../css/fontawesome.min.css" rel="stylesheet">
     <!-- EEL -->
     <script type='text/javascript' src='/eel.js'></script>
+
 </head>
 
 <body>
+
     <div id="wrapper" class="toggled">
         <!-- Sidebar -->
         <div id="sidebar-wrapper"></div>
-
         <!-- Page Content -->
         <div id="page-content-wrapper">
-            <div class="container-fluid">
+            <div class="container-fluid" id="content">
                 <a href="#menu-toggle" id="menu-toggle"><i class="fas fa-ellipsis-h"></i></a>
-                <a class="language" href="../forensic.html"> English</a>
+                <a class="language" href="../forensic.html"> English </a>
                 <hr><h3> Forensische Analyse <i class="fas fa-search"></i></h3><hr>
                 <br>
-                <div class="card">
+                <div class="card" id ="contentheader">
                     <div class="card-body">
                         Dieser Teil ermöglicht die Extraktion und Dekodierung von Tracking Dots aus gescannten Ausdrucken. Kopieren Sie den Pfad des gescannten Ausdruckes
-                        den Sie analysieren möchten in das Textfeld und klicken Sie auf "Dokument analysieren".
+                        den Sie analysieren möchten in das Textfeld und klicken Sie auf "Dokument analysieren". Bei Eingabe eines Ordnerpfades werden alle Bilddateien im Ordner nach Trackingdots analysiert.
                         <a tabindex="0" role="button" data-toggle="popover" data-trigger="focus" data-html="true" title="Dateipfad kopieren"
                         data-content="<u>Windows</u><ul><li>Shift+Rechtsklick auf Datei</li><li>Pfad kopieren</li><li>Strg+v im Textfeld</ul></li>
                         <u>Linux</u><ul><li>Strg+c auf Datei</li><li>Strg+v im Textfeld</li></ul>"><i class="far fa-lightbulb"></i></i></a>
                         <br><br>
-                        <form>
+                        <form id="headerform">
                           <div class="form-group">
-                            <input id="file_selector" class="form-control" placeholder="Geben Sie hier den Dateipfad des gescannten Ausdruckes ein."></input>
+                            <input id="file_selector" class="form-control" placeholder="Geben Sie einen einzelnen Datei- oder Ordnerpfad ein."></input>
+                             <div id="input-container"></div>
                           </div>
-                          <a href="javascript:void()" class="btn btn-secondary" data-dismiss="alert" onclick="pick_file()">Dokument analysieren</a>
-                          <i class="fas fa-spinner fa-pulse" id="loading" style="visibility:hidden;margin-left:10px;"></i>
+                          <a href="#" class="btn btn-secondary" onclick="addField()"><i class="fas fa-folder-plus"></i> Eingabefeld hinzufügen</a>
+                          <a href="#" class="btn btn-secondary" data-dismiss="alert" onclick="getForensicFiles()"><i class="fas fa-search"></i> Dokument analysieren</a>
                         </form>
                     </div>
                 </div>
-                <br>
-                <div class="alert alert-danger" id="file_info" role="alert" style="visibility:hidden;"></div>
-                <h5 id="resultshead"></h5>
-                <br>
-                <span class='label label-info' id="result_decoding"></span>
-                <br><br>
-                <span class='label label-info' id="result_matrix"></span>
-                <br><br><br><br>
             </div>
         </div>
     </div>
 
-    <!-- JavaScript Ext-->
+    <!-- JavaScript Ext -->
     <script src="../js/jquery.min.js"></script>
-    <script src="../js/bootstrap.bundle.min.js"></script>
-
-    <!-- Misc -->
-    <script type="text/javascript">
-        $("#menu-toggle").click(function(e) {
-            e.preventDefault();
-            $("#wrapper").toggleClass("toggled");
-        });
-        $(document).ready(function(){
-            $('#sidebar-wrapper').load('sidebar.html');
-        });
-        $('[data-toggle="popover"]').popover({
-            trigger: 'focus'
-        });
-    </script>
-
-    <!-- Forensic-->
-    <script type="text/javascript">
-        async function pick_file() {
-            document.getElementById('loading').style["visibility"] = "";
-            document.getElementById('resultshead').innerHTML = '';
-            document.getElementById('result_matrix').innerHTML = '';
-            document.getElementById('result_decoding').innerHTML = '';
-            let file = document.getElementById('file_selector').value;
-            let file_info = document.getElementById('file_info');
-            file_info.style["visibility"] = "hidden";
-            // Send to Python
-            let info = await eel.forensic(file)();
-            if(info != ''){
-                file_info.style["visibility"] = "";
-                file_info.innerHTML = info;
-            }
-            document.getElementById('loading').style["visibility"] = "hidden";
-        }
-        eel.expose(print_result);
-        function print_result(resultmatrix, resultdecoding){
-            document.getElementById('resultshead').innerHTML = "Results";
-            document.getElementById('result_matrix').innerHTML = resultmatrix;
-            document.getElementById('result_decoding').innerHTML = resultdecoding;
-        }
-    </script>
+    <script src="../js/popper.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+    <script src="../js/jspdf.min.js"></script>
+    <script src="../js/jspdf.plugin.autotable.min.js"></script>
+    <script src="../js/dom-to-image.min.js"></script>
+    <script src="../js/deda.js"></script>
 
 </body>
 

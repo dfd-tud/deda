@@ -123,7 +123,7 @@ class PrintParser(object):
         validMatrices[p] += [tdm]
         patternScore[p] += 1
         patternScoreSorted = sorted(list(patternScore.items()),
-            key=lambda e:e[1],reverse=True)
+            key=lambda e:e[1]*10+int(e[0].pid),reverse=True)
         self._print(", ".join(["p%s: %d"%(p,amount) 
                        for p,amount in patternScoreSorted]))
         if p.minCount>0 and patternScore[p] >= p.minCount:

@@ -13,13 +13,14 @@
     <!-- CSS Import-->
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/dedastyle.css" rel="stylesheet">
-    <link href="css/fontawesome-all.css" rel="stylesheet">
+    <link href="css/fontawesome.min.css" rel="stylesheet">
     <!-- EEL -->
     <script type='text/javascript' src='/eel.js'></script>
 
 </head>
 
 <body>
+
     <div id="wrapper" class="toggled">
         <!-- Sidebar -->
         <div id="sidebar-wrapper"></div>
@@ -35,8 +36,7 @@
                         <img class="logo" src="misc/logo.png"></img>
                         <p>This toolkit enables the extraction and decoding of scanned print outs regarding possible embedded tracking dots.
                         Futhermore it enables the anonymization of digitized print outs as well as the creation of an anonymization pattern for
-                        anonymized printing. Besides you can compare different sheets regarding their embedded tracking dots.<br>
-                        The tool is currently in beta-phase.
+                        anonymized printing. Besides you can compare different sheets regarding their embedded tracking dots or create own tracking dot pattern.
                         </p>
                     </div>
                 </div>
@@ -47,18 +47,8 @@
     <!-- JavaScript Ext-->
     <script src="js/jquery.min.js"></script>
     <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/deda.js"></script>
 
-    <!-- Sidebar -->
-    <script type="text/javascript">
-        $("#menu-toggle").click(function(e) {
-            e.preventDefault();
-            $("#wrapper").toggleClass("toggled");
-        });
-
-        $(document).ready(function(){
-            $('#sidebar-wrapper').load('sidebar.html');
-        });
-    </script>
 </body>
 
 </html>

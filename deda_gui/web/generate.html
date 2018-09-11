@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="Generate Pattern">
+    <meta name="author" content="stephan escher">
+
+    <title>Deda Toolkit</title>
+
+    <!-- CSS Import -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/dedastyle.css" rel="stylesheet">
+    <link href="css/fontawesome.min.css" rel="stylesheet">
+    <link href="css/bootstrap-datetimepicker.min.css" rel="stylesheet">
+    <!-- EEL -->
+    <script type='text/javascript' src='/eel.js'></script>
+
+</head>
+
+<body>
+
+    <div id="wrapper" class="toggled">
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper"></div>
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <div class="container-fluid" id="content">
+                <a href="#menu-toggle" id="menu-toggle"><i class="fas fa-ellipsis-h"></i></a>
+                <a class="language" href="de/generate.html"> Deutsch </a>
+                <hr><h3> Generate Pattern <i class="fas fa-cogs"></i></h3><hr>
+                <br>
+                <div class="card" id ="contentheader">
+                    <div class="card-body">
+                        Here you can create your own tracking dot matrix (pattern 4 only) and add it to a pdf document. Pass the contents as parameters.
+                        The generated document will be saved in your home directory (new_dots.pdf).
+                        <a tabindex="0" role="button" data-toggle="popover" data-trigger="focus" data-html="true" title="Copy file path"
+                        data-content="<u>Windows</u><ul><li>Shift+right click on file</li><li>copy path</li><li>Strg+v in text field</ul></li>
+                        <u>Linux</u><ul><li>Strg+c on file</li><li>Strg+v in text field</li></ul>"><i class="far fa-lightbulb"></i></i></a>
+                        <br><br>
+                        <form id="headerform">
+                            <div class="form-group" style="max-width:300px;">
+                                <input id="file_selector" class="form-control" placeholder="Type file path of the pdf"></input>
+                                <input id="datetime" placeholder="Datetime" style="margin-bottom:3px;font-size=0.85rem;" type="text" readonly class="form_datetime form-control">
+                                <input id="serial" pattern=".{0}|.{5,6}" input="number" class="form-control" style="margin-bottom:3px;" placeholder="SerialNumber (6 digits)"></input>
+                                <input id="manufacturer" type="number" min="1" max="3" class="form-control" style="margin-bottom:3px;" placeholder="Manufacturer (Epson:1, Xerox:2, or Dell:3)"></input>
+                                <input id="dotradius" type="number" step="0.001" class="form-control" style="margin-bottom:3px;" placeholder="Dotradius (default: 0.004)"></input>
+                            </div>
+                            <div class="form-row">
+                                <a href="#" class="btn btn-secondary" data-dismiss="alert" onclick="generatePattern()"><i class="fas fa-cogs"></i> Generate Document</a>
+                                <div id="loading_div" style="margin-left:10px;margin-top:7px;"></div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Ext -->
+    <script src="js/dom-to-image.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <script src="js/popper.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/bootstrap-datetimepicker.min.js"></script>
+    <script src="js/deda.js"></script>
+    <script>
+        $(".form_datetime").datetimepicker({
+            format: "dd.mm.yy hh:ii",
+            autoclose: true,
+            todayBtn: true,
+            pickerPosition: "bottom-left"
+        });
+    </script>
+
+</body>
+
+</html>

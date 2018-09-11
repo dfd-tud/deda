@@ -5,7 +5,7 @@
 
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="">
+    <meta name="description" content="Druck Anonymisierung">
     <meta name="author" content="stephan escher">
 
     <title>Deda Toolkit</title>
@@ -13,130 +13,71 @@
     <!-- CSS Import-->
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link href="../css/dedastyle.css" rel="stylesheet">
-    <link href="../css/fontawesome-all.css" rel="stylesheet">
+    <link href="../css/fontawesome.min.css" rel="stylesheet">
     <!-- EEL -->
     <script type='text/javascript' src='/eel.js'></script>
 
 </head>
 
 <body>
+
     <div id="wrapper" class="toggled">
         <!-- Sidebar -->
         <div id="sidebar-wrapper"></div>
-
         <!-- Page Content -->
         <div id="page-content-wrapper">
-            <div class="container-fluid">
-                <a href="#menu-toggle" id="menu-toggle"><i class="fas fa-ellipsis-h"></i></a><a class="language" href="../printanon2.html"> English</a>
-                <hr><h3> Druck Anonymisierung <i class="fas fa-print"></i></h3><hr>
-                <br>
-                <div id="card1" class="card">
-                    <div class="card-body">
-                          <b>1.</b> Falls Sie noch keine Druckmaske für den entsprechenden Drucker generiert haben, gehen Sie als Erstes zu: <a href="printanon.html"> <i class="fas fa-link"></i> Druckmaske Generieren</a>
-                    </div>
-                </div><br>
-                <div id="card1" class="card">
-                    <div class="card-body">
-                          <b>2.</b> Speichern Sie Ihr zu anonymisierendes Dokument als PostScript-Dokument (*.ps), z.B. mittels pdf2ps unter Linux. Einige Programme bieten auch
-                          eine Option für "exportieren unter" oder "speichern unter" als *.ps Datei an.
-                      </div>
-                  </div><br>
-                  <div id="card1" class="card">
-                      <div class="card-body">
-                          <form>
-                              <b>3.</b> Laden Sie das Dokument im PostScript-Format (Schritt 2) sowie die generierte Druckermaske (Schritt 1) und erzeugen Sie ein anonymisiertes Dokument. Dieses Dokument wird als "Dokumentname_masked.ps" im
-                              selben Ordner wie das Dokument gespeichert. Zusätzlich werden die Einstellungen unter im selben Pfad als "calibration_masked.txt" gespeichert. Drucken Sie diese Datei randlos aus und fahren Sie mit Schritt 4 fort.
-                              <a tabindex="0" role="button" data-toggle="popover" data-trigger="focus" data-html="true" title="Dateipfad kopieren"
-                              data-content="<u>Windows</u><ul><li>Shift+Rechtsklick auf Datei</li><li>Pfad kopieren</li><li>Strg+v im Textfeld</ul></li>
-                              <u>Linux</u><ul><li>Strg+c auf Datei</li><li>Strg+v im Textfeld</li></ul>"><i class="far fa-lightbulb"></i></i></a>
-                              <br>
-                              <div class="form-group" style="margin-top:20px;">
-                                    <input id='file_selector' class="form-control" placeholder='Dateipfad des Originaldokuments eingeben (*.ps)'></input>
-                                    <input id='mask_selector' style="font-size:0.9rem;margin-bottom:10px;max-width:550px;" class="form-control" placeholder='Dateipfad der generierten Druckermaske eingeben (*.json)'></input>
-                                    <div class="form-row" >
-                                        <div class="col-md-10"><a href='javascript:void()' class="btn btn-secondary" onclick='generate_file()'><i class="fas fa-pencil-alt"></i> Dokument Generieren</a></div>
-                                        <div class="col-md-2"><i class="fas fa-spinner fa-pulse" id="loading" style="visibility:hidden;margin-left:10px;"></i></div>
-                                    </div>
-                              </div>
-                              <br>
-                             <b>4.</b> Durch Scan-Artefakte ist es möglich, dass ein kleiner Versatz zwischen originalen und maskierten gelben Punkten entsteht.
-                              Um dies zu beheben, scannen Sie den anonymisierten Druck und kontrollieren Sie die gelben Punktmuster. Wenn ein Versatz festzustellen ist - variieren Sie x und y,
-                              um die Maskierungspunkte exakt mit den ursprünglichen gelben Punkten zu überlagern. Wiederholen Sie Schritt 3 mit x und y und klicken Sie erneut Dokument generiern.
-                              Der Punktradius beschreibt die Größe der zu druckenden Dokumente.
-                              <div class="form-group">
-                                <div class="form-row" style="margin:20px;max-width:300px;">
-                                    <input id="x" step="0.01" type="number" style="font-size:0.9rem;" class="form-control" placeholder='x offset (0)'></input>
-                                    <input id="y" step="0.01" type="number" style="font-size:0.9rem;" class="form-control" placeholder='y offset (0)'></input>
-                                    <input id="dotradius" step="0.001" type="number" style="font-size:0.9rem;" class="form-control" placeholder='Punktradius (0.004in)'></input>
-                              </div>
+            <div class="container-fluid" id="content">
+                <a href="#menu-toggle" id="menu-toggle"><i class="fas fa-ellipsis-h"></i></a><a class="language" href="../printanon2.html"> English </a>
+                <hr><h3> Druck Anonymisierung <i class="fas fa-print"></i></h3><hr><br>
+                <div class="card" id="contentheader">
+                  <div class="card-body">
+                      <form>
+                          <b>1.</b> Als Erstes <a href="printanon.html"> <i class="fas fa-link"></i> generieren Sie bitte eine Druckmaske</a>
+                          für den entsprechenden Drucker.<br><br>
+                          <b>2.</b>Laden Sie das Dokument (PDF) sowie die generierte Druckermaske (.json) und erzeugen Sie ein anonymisiertes Dokument.
+                          Dieses Dokument wird als "Dokumentname_masked.pdf" im selben Ordner wie das Dokument gespeichert.
+                          Zusätzlich werden die Einstellungen im selben Pfad als "calibration_masked.txt" gespeichert.
+                          Drucken Sie das anonymisierte Dokument randlos aus und fahren Sie mit Schritt 3 fort.
+                          <a tabindex="0" role="button" data-toggle="popover" data-trigger="focus" data-html="true" title="Dateipfad kopieren"
+                          data-content="<u>Windows</u><ul><li>Shift+Rechtsklick auf Datei</li><li>Pfad kopieren</li><li>Strg+v im Textfeld</ul></li>
+                          <u>Linux</u><ul><li>Strg+c auf Datei</li><li>Strg+v im Textfeld</li></ul>"><i class="far fa-lightbulb"></i></i></a><br>
+                          <div class="form-group" style="margin-top:20px;">
+                                <input id='file_selector' class="form-control" placeholder='Dateipfad des Originaldokuments eingeben (*.pdf)'></input>
+                                <input id='mask_selector' class="form-control" placeholder='Dateipfad der generierten Druckermaske eingeben (*.json)'></input>
+                                <div class="row form-row" >
+                                    <a style="margin-left:5px;" href="#" class="btn btn-secondary" onclick='generateAnonPrintFile()'><i class="fas fa-cogs"></i> Dokument generieren</a>
+                                    <div id="loading_div" style="margin-left:10px;margin-top:7px;"></div>
+                                </div>
                           </div>
-                        </form>
-                    </div>
+                          <br>
+                         <b>2.</b> Durch Scan-Artefakte ist es möglich, dass ein kleiner Versatz zwischen originalen und maskierten gelben Punkten entsteht.
+                          Um dies zu beheben, scannen Sie den anonymisierten Druck und kontrollieren Sie die gelben Punktmuster. Wenn ein Versatz festzustellen ist - variieren Sie x und y,
+                          um die Maskierungspunkte exakt mit den ursprünglichen gelben Punkten zu überlagern. Wiederholen Sie Schritt 2 mit x und y und klicken Sie erneut Dokument generiern.
+                          Der Punktradius beschreibt die Größe der zu druckenden Tracking Dots.
+                          <div class="form-group">
+                            <div class="form-row" style="margin:20px;">
+                                <div class="col-md-4" style="max-width:300px;">
+                                    <input id="x" step="0.01" type="number" class="form-control" placeholder='X-Offset'></input>
+                                    <input id="y" step="0.01" type="number" class="form-control" placeholder='Y-Offset'></input>
+                                    <input id="dotradius" step="0.001" type="number" class="form-control" placeholder='Radius (0.004in)'></input>
+                                </div>
+                                <div class="col-md-4" style="margin-left: 20px;">
+                                    <img src="../misc/x-y.png" style="max-height: 120px;"></img>
+                                </div>
+                          </div>
+                      </div>
+                    </form>
+                  </div>
                 </div>
-                <br>
-                <div class="alert alert-danger" id="file_info" role="alert" style="visibility:hidden;"></div>
-                <div class="alert alert-success" id="result" role="alert" style="visibility:hidden;"></div>
-                <br>
-                <span class='label label-info' id="result2"></span>
-                <br><br><br><br>
             </div>
         </div>
     </div>
 
     <!-- JavaScript Ext-->
     <script src="../js/jquery.min.js"></script>
-    <script src="../js/bootstrap.bundle.min.js"></script>
-
-    <!-- Misc -->
-    <script type="text/javascript">
-        $("#menu-toggle").click(function(e) {
-            e.preventDefault();
-            $("#wrapper").toggleClass("toggled");
-        });
-        $(document).ready(function(){
-            $('#sidebar-wrapper').load('sidebar.html');
-        });
-        $('[data-toggle="popover"]').popover({
-            trigger: 'focus'
-        });
-    </script>
-
-
-    <!-- Anonymization -->
-    <script type="text/javascript">
-
-        async function generate_file() {
-            document.getElementById('loading').style["visibility"] = '';
-            let page = document.getElementById('file_selector').value;
-            let mask = document.getElementById('mask_selector').value;
-            let x = document.getElementById('x').value;
-            let y = document.getElementById('y').value;
-            let dotradius = document.getElementById('dotradius').value;
-            let file_info = document.getElementById('file_info');
-            let result = document.getElementById('result');
-            file_info.innerHTML = '';
-            result.innerHTML = '';
-
-            file_info.style["visibility"] = "hidden";
-            result.style["visibility"] = "hidden";
-            // Send to Python
-            let info = await eel.applyMask(page, mask, x, y, dotradius)();
-            if(info == 'Done'){
-                result.style["visibility"] = '';
-                result.innerHTML = 'Done. Masked document was generated and saved.<br>';
-            }
-            else if(info != ''){
-                file_info.style["visibility"] = '';
-                file_info.innerHTML = info;
-            }
-            document.getElementById('loading').style["visibility"] = 'hidden';
-        }
-
-        eel.expose(print_result);
-        function print_result(result) {
-            document.getElementById("result2").innerHTML = result;
-        }
-    </script>
+    <script src="../js/popper.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+    <script src="../js/deda.js"></script>
 
 </body>
 

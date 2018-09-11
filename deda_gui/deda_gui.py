@@ -12,9 +12,12 @@ the Free Software Foundation, either version 3 of the License, or
 import cv2
 import eel
 import os, sys
+from os.path import expanduser
+import time
 import numpy as np
-from libdeda.print_parser import PrintParser, comparePrints
-from libdeda.privacy import AnonmaskApplier, calibrationScan2Anonmask, \
+from libdeda.pattern_handler import TDM, Pattern4
+from libdeda.print_parser import *
+from libdeda.privacy import AnonmaskApplier, AnonmaskApplierTdm, calibrationScan2Anonmask, \
     cleanScan
 
 
@@ -25,62 +28,115 @@ def main():
     #--- Extract and Decode section
     #---
     @eel.expose
-    def forensic(upload):
-        if os.path.isfile(upload):
-            filext = os.path.splitext(upload)[1].lower()
-            filename = os.path.split(upload)[1]
-            if(filext=='.jpeg' or filext=='.jpg' or filext=='.png' or filext=='.tiff' or filext=='.bmp'):
-                return forensicAction(upload)
+    def forensic(uploads):
+        file_uploads = []
+        for upload in uploads:
+
+            #upload is folder path:
+            if os.path.isdir(upload):
+                files = [os.path.join(upload, s) for s in os.listdir(upload)
+                        if not os.path.isdir(os.path.join(upload, s))]
+                file_count = 0
+                for f in files:
+                    filext = os.path.splitext(f)[1].lower()
+                    filename = os.path.split(f)[1]
+                    if(filext=='.jpeg' or filext=='.jpg' or filext=='.png' or filext=='.tiff' or filext=='.bmp'):
+                        file_uploads.append(f)
+                        file_count += 1
+                if(file_count==0):
+                    return ('%s doesnt contain a valid Image.'%(upload))
+
+            #upload is file path
+            elif os.path.isfile(upload):
+                filext = os.path.splitext(upload)[1].lower()
+                filename = os.path.split(upload)[1]
+                if(filext=='.jpeg' or filext=='.jpg' or filext=='.png' or filext=='.tiff' or filext=='.bmp'):
+                    file_uploads.append(upload)
+                else:
+                    return '%s is not a valid Image. Currently only jpg, png, tiff or bmp are allowed.'%(upload)
             else:
-                return 'Not a valid Image. Currently only jpg, png, tiff or bmp are allowed.'
-        else:
-            return 'Not a valid Path to an Image'
+                return '%s is not valid Path to an image or a folder containing them.'%(upload)
 
-    def forensicAction(imgfile):
-        try:
-            with open(imgfile,"rb") as fp:
-                pp = PrintParser(fp.read())
-        except YD_Parsing_Error as e: pattern = None
-        else: pattern = pp.pattern
-        print(pattern)
-        if pattern is None:
-            result = ('No tracking dot pattern detected. For best results '
-                'try a 300 dpi scan and a lossless file format.')
+        # forensic analysis of uploads
+        return forensicAction(file_uploads)
+
+
+    def forensicAction(file_uploads):
+
+        allresults = []
+        fullfail = []
+        extractfail = []
+        errors = []
+
+        for imgfile in file_uploads:
+            fpath = os.path.split(imgfile)[1]
+            imgresult = []
+            try:
+                with open(imgfile,"rb") as fp:
+                    pp = PrintParser(fp.read())
+            except YD_Parsing_Error as e: pattern = None
+            else: pattern = pp.pattern
+            if pattern is None:
+                fullfail.append(fpath)
+            elif pp.tdm is None:
+                extractfail.append(fpath)
+            else:
+                #create table with yd matrix
+                result_matrix = str(pp.tdm).split('\t')[0].split('\n')
+                countdots = str(np.sum(pp.tdm.aligned==1))
+
+                #create table with decoding results
+                dec = pp.tdm.decode() # keys: manufacturer, raw, serial, timestamp
+
+                result_decoding = []
+                result_decoding.append(fpath)
+                result_decoding.append(str(pp.pattern))
+
+                if dec.get('manufacturer') != None:
+                    result_decoding.append(dec.get('manufacturer'))
+                else:
+                    result_decoding.append('N/A')
+                if dec.get('serial') != None:
+                    result_decoding.append(dec.get('serial'))
+                else:
+                    result_decoding.append('N/A')
+                if dec.get('timestamp') != None:
+                    result_decoding.append(dec.get('timestamp').strftime("%Y-%m-%d %H:%M:%S"))
+                else:
+                    result_decoding.append('N/A')
+                if dec.get('raw') != None:
+                    result_decoding.append(dec.get('raw'))
+                else:
+                    result_decoding.append('N/A')
+                result_decoding.append(countdots)
+
+                imgresult.append(result_matrix)
+                imgresult.append(result_decoding)
+                allresults.append(imgresult)
+
+        errors.append(fullfail)
+        errors.append(extractfail)
+
+        #expose failures
+        if(len(file_uploads)>1 and (len(fullfail)>0 or len(extractfail)>0)):
+            result = '%s Files: Tracking Dots succesfully extracted.<br>'%(str(len(file_uploads)-len(fullfail)-len(extractfail)))
+            if len(fullfail)>0:
+                result = '%s %s Files: No Tracking Dots detected.<br>'%(result, str(len(fullfail)))
+            if len(extractfail)>0:
+                result = '%s %s Files: Tracking Dots detected, but no valid TDM could be extracted.<br>'%(result, str(len(fullfail)))
+            #send results to javascript
+            eel.printForensicResult(allresults, errors)
             return result
-        result_pattern = pp.pattern
 
-        if pp.tdm is None: return 'Tracking Dots detected, but no valid TDM could be extracted.'
-
-        #create table with yd matrix
-        result_matrix = '<table class="table table-bordered table-sm table-dark table-hover text-center" id="tdmtable"><tbody>'
-        tdmlist = str(pp.tdm).split('\t')[0].split('\n')
-        countdots = str(np.sum(pp.tdm.aligned==1))
-        #countdots = str(str(pp.tdm).split('\t')[1])
-
-        for i in tdmlist:
-            if len(i)>0:
-                result_matrix += '<tr><th scope = "row">' + i[0] + '</th>'
-                for j in range(2,len(i),2):
-                    if i[j] == '.':
-                        result_matrix += '<td style="color:yellow;"><i class="far fa-dot-circle"></i></td>'
-                    else:
-                        result_matrix += '<td>' + i[j] + '</td>'
-                result_matrix += '</tr>'
-        result_matrix += '</tbody></table>'
-
-        #create table with decoding results
-        dec = pp.tdm.decode() # keys: manufacturer, raw, serial, timestamp
-        result_decoding = '<table class="table table-bordered table-sm table-hover" id="resulttable"><tbody>'
-        result_decoding += '<tr><th scope="row">Analysed Image</th><td>' + os.path.split(imgfile)[1] + '</td></tr>'
-        result_decoding += '<tr><th scope="row">Detected Pattern</th><td>' + str(result_pattern) + '</td></tr>'
-
-        for key, val in dec.items():
-            result_decoding = '%s<tr><th scope="row">%s</th><td>%s</td></tr>'%(result_decoding, str(key).title(), val)
-        result_decoding += '<tr><th scope="row">Dot Count per Pattern</th><td>' + countdots + '</td></tr></tbody></table>'
+        elif len(fullfail)>0:
+            return 'No tracking dot pattern detected. For best results try a 300 dpi scan and a lossless file format.'
+        elif len(extractfail)>0:
+            return 'Tracking Dots detected, but no valid TDM could be extracted. Try $ deda_extract_yd INPUTFILE for more information.'
 
         #send results to javascript
-        eel.print_result(result_matrix, result_decoding)
+        eel.printForensicResult(allresults, errors)
         return ''
+
 
     #---
     #--- Compare Documents
@@ -102,7 +158,7 @@ def main():
                         file_uploads.append(f)
                         file_count += 1
                 if(file_count==0):
-                    return (upload + ' doesnt contain a valid Image.')
+                    return ('%s doesnt contain a valid Image.'%upload)
 
             #upload is file path:
             elif os.path.isfile(upload):
@@ -111,10 +167,9 @@ def main():
                 if(filext=='.jpeg' or filext=='.jpg' or filext=='.png' or filext=='.tiff' or filext=='.bmp'):
                     file_uploads.append(upload)
                 else:
-                    return (upload + ' is not a valid Image. Currently only jpg, png, tiff or bmp are allowed.')
-            #else
+                    return ('%s is not a valid Image. Currently only jpg, png, tiff or bmp are allowed.'%upload)
             else:
-                return (upload + ' is not valid Path to an image or a folder containing them.')
+                return ('%s is not valid Path to an image or a folder containing them.'%upload)
 
         if len(file_uploads)<2:
             return 'To compare tracking dots you have to enter at least 2 pictures or a folder containing them.'
@@ -124,82 +179,79 @@ def main():
 
 
     def compareAction(file_uploads):
-        printers = {}
-        errors = []
         info = ""
-        files = []
-        for f in file_uploads:
-            with open(f,"rb") as fp: files.append(fp.read())
-        printers, errors, identical = comparePrints(files)
+        printers, errors, identical = comparePrints(file_uploads)
 
         if identical:
-            info = "The tracking dots of all input images have been detected as IDENTICAL."
-        elif len(printers) == 1:
-            info = str(len(file_uploads)-len(errors)) + ' of ' + str(len(file_uploads)) + ' images were succesfully analysed and have been detected as IDENTICAL. <br> ' + str(len(errors)) + ' images have no tracking dots or could not be extracted.'
+            info = 'The tracking dots of all input images have been detected as IDENTICAL.'
+        elif len(printers) == 1 and (len(file_uploads)-len(errors))==1:
+            info =  'Tracking dots of only 1 out of %s images could be extracted. Comparison not possible.'%(str(len(file_uploads)))
+        elif len(printers) == 1 and (len(file_uploads)-len(errors)) > 1:
+            info =  '%s of %s images were successfully analysed and have been detected as IDENTICAL. <br>%s images have no tracking dots or could not be extracted.'%(str(len(file_uploads)-len(errors)), str(len(file_uploads)), str(len(errors)))
         elif len(errors) == 0:
-            info = 'The tracking dots of all input images have been detected.<br>' + str(len(file_uploads)) + ' images have been extracted. <br>' + str(len(printers)) + ' different patterns were found.'
+            info = 'The tracking dots of all input images have been detected.<br>%s images have been extracted. <br>%s different patterns were found.'%(str(len(file_uploads)), str(len(printers)))
         elif len(printers) == 0:
             info = 'No tracking dots found.'
         else:
-            info = 'Tracking dots could be extracted in ' + str(len(file_uploads)-len(errors)) + ' of ' + str(len(file_uploads)) + ' images. <br>' + str(len(printers)) + ' different patterns were found. <br>'+ str(len(errors)) + ' images have no tracking dots or could not be extracted.'
+            info = 'Tracking dots could be extracted in %s of %s images. <br>%s different patterns were found. <br>%s images have no tracking dots or could not be extracted.'%(str(len(file_uploads)-len(errors)), str(len(file_uploads)),str(len(printers)), str(len(errors)))
 
-        result_compare = '<table class="table table-bordered table-sm table-hover" id="resulttable">'
-        result_compare += '<thead><tr><th scope="col">#</th><th scope="col">Printer Information</th><th scope="col">Files</th></tr></thead><tbody>'
+        results_compare = []
+
         for i, p in enumerate(printers):
-            result_compare += '<tr><th scope="row">' + str(i+1) + '</th>'
-            result_compare += '<td>'
-            #for key,val in filesinfo[0][1].items():
-            #    result_compare += '<i>' + key.title() + '</i>: ' + val + '<br>'
-            result_compare += '</td><td>'
-            for f in p["files"]:
-                result_compare += f + '<hr id="table_hr">'
-            result_compare += '</td></tr>'
+            results_equal = []
+            results_equal.append(str(i+1))
+            results_equal.append(p['manufacturer'])
+            fequals = []
+            for f in p['files']:
+                fequals.append(str(f))
+            results_equal.append(fequals)
+            results_compare.append(results_equal)
 
         if len(errors) > 0:
-            result_compare += '<tr><th scope="row">Errors</th>'
-            result_compare += '<td>These images have no tracking dots or could not be extracted.</td><td>'
-            for e, f in errors:
-                result_compare += f + '<hr id="table_hr">'
-            result_compare += '</td></tr>'
+            results_error = []
+            results_error.append('Errors')
+            results_error.append('These images have no tracking dots or could not be extracted.')
 
-        result_compare += '</tbody></table>'
+            fequals = []
+            for e, f in errors:
+                fequals.append(str(f))
+            results_error.append(fequals)
+            results_compare.append(results_error)
+
         #send output to javascript
-        eel.print_result(info, result_compare)
+        eel.printCompareResult(info, results_compare)
         return ''
 
     #---
     #--- Anon Scan
     #---
     @eel.expose
-    def anonScanAction(upload, savepath):
+    def anonScanAction(upload):
         if os.path.isfile(upload):
             filext = os.path.splitext(upload)[1].lower()
             path, filename = os.path.split(upload)
-            path = path + '/'
+            path = '%s/'%path
             if(filext=='.jpeg' or filext=='.jpg' or filext=='.png' or filext=='.tiff' or filext=='.bmp'):
                 ext = os.path.splitext(os.path.basename(upload))[1]
                 with open(upload,"rb") as fpin:
                     outfile = cleanScan(fpin.read(),outformat=ext)
-                if(savepath == ''):
-                    output = os.path.splitext(os.path.basename(upload))[0] + '_anon' + ext
-                    save = path + output
-                    with open(save, "wb") as fpout:
-                        fpout.write(outfile)
-                    info = 'Document anonymized and saved.<br>'
-                    result = '<table class="table table-bordered table-sm table-dark table-hover text-center" id="resulttable"><tbody>'
-                    result += '<tr><th scope="row">Path</th><td>' + path + '</td></tr>'
-                    result += '<tr><th scope="row">Image</th><td>' + filename + '</td></tr>'
-                    result += '<tr><th scope="row">Anonymized Image</th><td>' + output + '</td></tr></tbody></table>'
-                    #send output to javascript
-                    eel.print_result(info, result)
-                else:
-                    #TODO
-                    output = savepath
+
+                output = '%s_anon%s'%(os.path.splitext(os.path.basename(upload))[0],ext)
+                save = '%s%s'%(path,output)
+                with open(save, "wb") as fpout:
+                    fpout.write(outfile)
+                info = 'Document anonymized and saved.'
+                result = []
+                result.append(path)
+                result.append(filename)
+                result.append(output)
+                #send output to javascript
+                eel.printAnonScan(info, result)
                 return ''
             else:
-                return 'Not a valid Image. Currently only jpg, png, tiff or bmp are allowed'
+                return 'Not a valid Image. Currently only jpg, png, tiff or bmp are allowed.'
         else:
-            return 'Not a valid Path'
+            return 'Not a valid Path.'
 
 
     #---
@@ -209,36 +261,37 @@ def main():
     def generateMask(upload):
         if os.path.isfile(upload):
             filext = os.path.splitext(upload)[1].lower()
-            path = os.path.split(upload)[0] + '/'
-
+            path = '%s/'%os.path.split(upload)[0]
             if(filext=='.jpeg' or filext=='.jpg' or filext=='.png' or filext=='.tiff' or filext=='.bmp'):
                 try:
-                  with open(upload,"rb") as fpin:
-                    with open("mask.json","wb") as fpout: 
-                        fpout.write(
-                          calibrationScan2Anonmask(fpin.read(), copy=False))
-                  return 'Done. Mask was generated and saved as ' + path + 'mask.json'
+                    with open(upload,'rb') as fp:
+                        mask = calibrationScan2Anonmask(fp.read(),copy=False)
+                    output = '%smask.json'%path
+                    with open(output,'wb') as fp:
+                        fp.write(mask)
+                    return 'Done. Mask was generated and saved as %smask.json'%path
                 except:
                     return 'An Error occoured.'
             else:
-                return 'Not a valid Image. Currently only jpg, png, tiff or bmp are allowed'
+                return 'Not a valid Image. Currently only jpg, png, tiff or bmp are allowed.'
         else:
-            return 'Not a valid Path'
+            return 'Not a valid Path.'
+
 
     #---
     #--- Apply Print Mask
     #---
     @eel.expose
     def applyMask(page, mask, x, y, dotradius):
-        if not os.path.isfile(page): 
+        if not os.path.isfile(page):
             return 'Not a valid Path to Document File.'
         if not os.path.isfile(mask): return 'Not a valid Path to Mask File.'
         pagename, pageext = os.path.splitext(page)
         pageext = pageext.lower()
-        pagepath = os.path.split(page)[0] + '/'
+        pagepath =  '%s/'%os.path.split(page)[0]
         maskext = os.path.splitext(mask)[1].lower()
-        if not (pageext=='.pdf'): 
-            return ('Not a valid Document File - please provide a PDF ' 
+        if not (pageext=='.pdf'):
+            return ('Not a valid Document File - please provide a PDF '
                 'Document.')
         if not (maskext=='.json'): return 'Not a valid Mask File (json).'
         try:
@@ -248,38 +301,115 @@ def main():
             else: y = float(y)
             if (dotradius==''): dotradius = 0.004
             else: dotradius = float(dotradius)
-            with open(mask,"rb") as fp:
-                aa = AnonmaskApplier(fp.read(),dotradius,x,y)
-            with open("%s_masked.pdf"%pagename,"wb") as pdfout:
-                pdfout.write(aa.apply(pdfin.read()))
-            
+
+            with open(mask) as maskin:
+                aa = AnonmaskApplier(maskin.read(),dotradius,x,y)
+
+            with open('%s_masked.pdf'%pagename,'wb') as pdfout:
+                with open(page, 'rb') as pdfin:
+                    pdfout.write(aa.apply(pdfin.read()))
+
             xoff = aa.xOffset
             yoff = aa.yOffset
             dotrad = aa.dotRadius
-            text_file = open(pagename + "_masked.txt", "w")
-            text_file.write("X-Offset: %s \ny-Offset: %s \nDotradius: %s" % (xoff, yoff, dotrad))
+            text_file = open('%scalibration_masked.txt'%pagepath, 'w')
+            text_file.write('X-Offset: %s \ny-Offset: %s \nDotradius: %s'%(xoff, yoff, dotrad))
             text_file.close()
-            info = 'Done'
-            result = '<table class="table table-bordered table-sm table-dark table-hover text-center" id="resulttable"><tbody>'
-            result += '<tr><th scope="row">Masked Document</th><td>' + pagename + '_masked.pdf</td></tr>'
-            result += '<tr><th scope="row">Info File</th><td>' + pagename + '_masked.txt</td></tr>'
-            result += '<tr><th scope="row">x-Offset</th><td>' + str(round(xoff,4)) + '</td></tr>'
-            result += '<tr><th scope="row">y-Offset</th><td>' + str(round(yoff,4)) + '</td></tr>'
-            result += '<tr><th scope="row">Dotradius</th><td>' + str(dotrad) + '</td></tr></tbody></table>'
+            info = 'Done. Masked document was generated and saved.'
+            result = []
+            result.append('%s_masked.pdf'%pagename)
+            result.append('%scalibration_masked.txt'%pagepath)
+            result.append(str(round(xoff,4)))
+            result.append(str(round(yoff,4)))
+            result.append(str(dotrad))
+
             #send output to javascript
-            eel.print_result(result)
-            return info
+            eel.printAnonMaskResult(info, result)
+            return ''
         except:
             return 'An Error occoured.'
 
+    #---
+    #--- Apply Print Mask
+    #---
+    @eel.expose
+    def generatePattern(pdf, datetime, serial, manufacturer, dotradius):
+        if not os.path.isfile(pdf):
+            return 'Not a valid Path to Document File.'
+        #date and time
+        if(datetime==''):
+            hour=11
+            minutes=11
+            day=11
+            month=11
+            year=18
+        else:
+            a = datetime.split(' ')
+            date = a[0].split('.')
+            time = a[1].split(':')
+            hour = time[0]
+            minutes = time[1]
+            day = date[0]
+            month = date[1]
+            year = date[2]
+        #serial number
+        if(serial == ''):
+            serial = 123456
+        elif(len(serial) != 6):
+            return 'Serial Number has to be a 6 digit number'
+        else:
+            try:
+                serial = int(serial)
+            except:
+                return ('Serial Number has to be a 6 digit number')
+        #manufacturer
+        if(manufacturer == '' or manufacturer == '1'):
+            manufacturer = 'Epson'
+        elif(manufacturer == '2'):
+            manufacturer = 'Xerox'
+        elif(manufacturer == '3'):
+            manufacturer = 'Dell'
+        else:
+            return ('Manufacturer has to be Xerox, Epson or Dell')
+        #dotRadius
+        if(dotradius == ''):
+            dotradius = 0.004
+        else:
+            dotradius = float(dotradius)
+
+        tdm = TDM(Pattern4, content=dict(
+            serial=serial,
+            hour=hour,
+            minutes=minutes,
+            day=day,
+            month=month,
+            year=year,
+            manufacturer=manufacturer,
+        ))
+        home = expanduser('~')
+        OUTFILE = '%s/new_dots.pdf'%home
+        aa = AnonmaskApplierTdm(tdm,dotRadius=dotradius)
+        with open(OUTFILE,'wb') as pdfout:
+            with open(pdf,"rb") as pdfin:
+                pdfout.write(aa.apply(pdfin.read()))
+
+        #create table with yd matrix
+        result_matrix = str(tdm).split('\t')[0].split('\n')
+        countdots = str(np.sum(tdm.aligned==1))
+        #result matrix
+        timestamp = ('%s.%s.%s %s:%s'%(str(day), str(month),str(year),str(hour),str(minutes)))
+        result_decoding = [OUTFILE, 'Pattern 4', manufacturer, str(serial), timestamp, dotradius,countdots]
+        #send output to javascript
+        eel.printCreateResult(result_matrix, result_decoding)
+        return ''
 
     #---
     #--- Start GUI
     #---
     web_app_options = {
-	    'mode': "", #"chrome", #or "chrome-app"
+	    'mode': '', #"chrome", #or "chrome-app"
 	    'port': 8080,
-	    'chromeFlags': ["--size=(1024, 800)"]
+	    #'chromeFlags': ["--size=(1024, 800)"]
     }
 
     eel.start('index.html', options=web_app_options)
@@ -287,4 +417,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    

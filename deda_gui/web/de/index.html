@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 
 <head>
 
@@ -13,7 +13,7 @@
     <!-- CSS Import-->
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link href="../css/dedastyle.css" rel="stylesheet">
-    <link href="../css/fontawesome-all.css" rel="stylesheet">
+    <link href="../css/fontawesome.min.css" rel="stylesheet">
     <!-- EEL -->
     <script type='text/javascript' src='/eel.js'></script>
 
@@ -36,8 +36,7 @@
                         <p>Dieses Toolkit ermöglicht die Extraktion und Dekodierung von gescannten Ausdrucken hinsichtlich möglicher
                             eingebetteter Tracking-Punkte. Darüber hinaus ermöglicht es die Anonymisierung von digitalisierten Ausdrucken
                             sowie die Erstellung eines Anonymisierungsmusters für den Druck. Außerdem können Sie verschiedene Ausdrucke
-                            hinsichtlich ihrer eingebetteten Tracking-Punkte vergleichen.<br>
-                            Das Tool ist derzeit noch in der Beta-Phase.
+                            hinsichtlich ihrer eingebetteten Tracking-Punkte vergleichen oder eigene Tracking Dot Muster erstellen.
                         </p>
                     </div>
                 </div>
@@ -48,18 +47,8 @@
     <!-- JavaScript Ext-->
     <script src="../js/jquery.min.js"></script>
     <script src="../js/bootstrap.bundle.min.js"></script>
+    <script src="../js/deda.js"></script>
 
-    <!-- Sidebar -->
-    <script type="text/javascript">
-        $("#menu-toggle").click(function(e) {
-            e.preventDefault();
-            $("#wrapper").toggleClass("toggled");
-        });
-
-        $(document).ready(function(){
-            $('#sidebar-wrapper').load('sidebar.html');
-        });
-    </script>
 </body>
 
 </html>

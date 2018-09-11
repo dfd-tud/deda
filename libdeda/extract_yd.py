@@ -480,16 +480,15 @@ class MatrixTools(object):
     def matrixSubsets(self, m, len0,len1):
         """ 
         Returns a subset of input matrix @m where each subset
-        has the dimensions @len0 x @len1 and all parts of @m are covered. 
-        yields (cropx int, cropy int, m_crop np.array)
+        has the dimensions @len0 x @len1 and all party of @m are covered. 
+        @returns: [(x_coord_in_m, y_coord_in_m, m_crop)]
         """
-        horiz = list(range(min(1,int(math.floor(m.shape[0]/len0)))))
-        vert = list(range(min(1,int(math.floor(m.shape[1]/len1)))))
-        if m.shape[0] > len0: horiz += [m.shape[0]-len0]
-        if m.shape[1] > len1: vert += [m.shape[1]-len1]
-        for x0 in horiz:
-            for y0 in vert:
-                yield (x0,y0,m[x0:(x0+len0),y0:(y0+len1)])
+        mList = [
+            (x0,y0,m[x0:(x0+len0),y0:(y0+len1)])
+            for x0 in [x*len0 for x in range(int(math.floor(m.shape[0]/len0)))]+[m.shape[0]-len0]
+            for y0 in [y*len1 for y in range(int(math.floor(m.shape[1]/len1)))]+[m.shape[1]-len1]
+        ]
+        return mList
         
 
 class RepetitionDetectorMixin(Common,MatrixTools):

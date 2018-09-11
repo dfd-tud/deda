@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="Pattern Generieren">
+    <meta name="author" content="stephan escher">
+
+    <title>Deda Toolkit</title>
+
+    <!-- CSS Import -->
+    <link href="../css/bootstrap.min.css" rel="stylesheet">
+    <link href="../css/dedastyle.css" rel="stylesheet">
+    <link href="../css/fontawesome.min.css" rel="stylesheet">
+    <link href="../css/bootstrap-datetimepicker.min.css" rel="stylesheet">
+    <!-- EEL -->
+    <script type='text/javascript' src='/eel.js'></script>
+
+</head>
+
+<body>
+
+    <div id="wrapper" class="toggled">
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper"></div>
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <div class="container-fluid" id="content">
+                <a href="#menu-toggle" id="menu-toggle"><i class="fas fa-ellipsis-h"></i></a>
+                <a class="language" href="../generate.html"> English </a>
+                <hr><h3> Pattern Generieren <i class="fas fa-cogs"></i></h3><hr>
+                <br>
+                <div class="card" id ="contentheader">
+                    <div class="card-body">
+                        Hier können Sie Ihre eigene Tracking-Punktmatrix (nur Muster 4) erstellen
+                        und in ein PDF-Dokument einfügen. Übergeben Sie den Inhalt als Parameter.
+                        Das generierte Dokument wird in Ihrem Home Ordner gespeichert (new_dots.pdf).
+                        <a tabindex="0" role="button" data-toggle="popover" data-trigger="focus" data-html="true" title="Datei/Ordnerpfad kopieren"
+                        data-content="<u>Windows</u><ul><li>Shift+Rechtsklick auf Datei/Ordner</li><li>Pfad kopieren</li><li>Strg+v im Textfeld</ul></li>
+                        <u>Linux</u><ul><li>Strg+c auf Datei/Ordner</li><li>Strg+v im Textfeld</li></ul>"><i class="far fa-lightbulb"></i></i></a>
+                        <br><br>
+                        <form id="headerform">
+                            <div class="form-group" style="max-width:300px;">
+                                <input id="file_selector" class="form-control" placeholder="Pfad zum PDF Dokument"></input>
+                                <input id="datetime" placeholder="Datum und Zeit" style="margin-bottom:3px;font-size=0.85rem;" type="text" readonly class="form_datetime form-control">
+                                <input id="serial" pattern=".{0}|.{5,6}" input="number" class="form-control" style="margin-bottom:3px;" placeholder="Seriennummer (6-stellig)"></input>
+                                <input id="manufacturer" type="number" min="1" max="3" class="form-control" style="margin-bottom:3px;" placeholder="Hersteller (Epson:1, Xerox:2, oder Dell:3)"></input>
+                                <input id="dotradius" type="number" step="0.001" class="form-control" style="margin-bottom:3px;" placeholder="Punktradius (default: 0.004)"></input>
+                            </div>
+                            <div class="form-row">
+                                <a href="#" class="btn btn-secondary" data-dismiss="alert" onclick="generatePattern()"><i class="fas fa-cogs"></i> Dokument generieren</a>
+                                <div id="loading_div" style="margin-left:10px;margin-top:7px;"></div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Ext -->
+    <script src="../js/dom-to-image.min.js"></script>
+    <script src="../js/jquery.min.js"></script>
+    <script src="../js/popper.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+    <script src="../js/bootstrap-datetimepicker.min.js"></script>
+    <script src="../js/deda.js"></script>
+    <script>
+        $(".form_datetime").datetimepicker({
+            format: "dd.mm.yy hh:ii",
+            autoclose: true,
+            todayBtn: true,
+            pickerPosition: "bottom-left"
+        });
+    </script>
+
+</body>
+
+</html>

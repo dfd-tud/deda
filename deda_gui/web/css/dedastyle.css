@@ -1,12 +1,15 @@
 body {
   overflow-x: hidden;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   background: #EBEBEB;
   color: #4E5D6C;
 }
 
 a{
     color: #2B3E50;
+}
+.form-control{
+    font-size: 0.8rem;
 }
 
 .break{
@@ -21,8 +24,13 @@ a{
 }
 
 .btn{
-    font-size: 0.9rem;
+    font-size: 0.8rem;
 }
+
+.dropdown-menu{
+    font-size: 0.85rem;
+}
+
 /* Wrapper */
 #wrapper {
   padding-left: 0;
@@ -133,7 +141,7 @@ a{
 
 /* Forensic Styles */
 .card {
-    font-size: 0.9rem;
+    font-size: 0.83rem;
     color: #222;
     background: #efefef;
 }
@@ -142,6 +150,8 @@ a{
     font-size:0.7rem;
     line-height:0.7;
     width: auto !important;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 #resulttable {
@@ -151,11 +161,16 @@ a{
 #file_selector{
     max-width: 550px;
     margin-bottom: 3px;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
 }
 #save_selector{
     max-width: 550px;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
+}
+#mask_selector{
+    max-width: 550px;
+    font-size: 0.8rem;
+    margin-bottom:10px;
 }
 
 #table_hr{

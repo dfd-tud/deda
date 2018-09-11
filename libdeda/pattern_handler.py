@@ -79,11 +79,11 @@ class _PatternInterface(object):
         raise NotImplementedError()
         
 
-class _SetPatternName(type):
+class _SetPatternId(type):
 
     def __new__(cls, clsname, superclasses, attributedict):
         c = type.__new__(cls, clsname, superclasses, attributedict)
-        c.name = c.__str__()
+        c.pid = c.__int__()
         return c
         
         
@@ -207,7 +207,7 @@ class _AligningMixin(object):
         
 
 class _AbstractPattern(_PatternInstantiationMixin, _PatternInterface,
-                       _AligningMixin, metaclass=_SetPatternName):
+                       _AligningMixin, metaclass=_SetPatternId):
     """
     Abstract pattern class
     Child classes represent patterns and must provide a full 
@@ -222,9 +222,7 @@ class _AbstractPattern(_PatternInstantiationMixin, _PatternInterface,
     
     empty=[] # list of coordinate tuples where matrix should not have dots
     markers=[]
-    codebits = property(lambda self:[(x,y) 
-        for x in range(self.n_i_prototype) 
-        for y in range(self.n_j_prototype)])
+    codebits=[]
     allowFlip=False # analyse the horizontally flipped matrix as well
     allowUpsideDown=True
     allowRotation = True # If true, finds a pattern rotated by 90 degree
@@ -249,10 +247,14 @@ class _AbstractPattern(_PatternInstantiationMixin, _PatternInterface,
     def __call__(self, *args, **xargs):
         """ Create a new instance, object acts as class constructor """
         return self.__class__(*args,**xargs)
-    
+        
     @classmethod
+    def __int__(self):
+        pid = ''.join(list(filter(str.isdigit, self.__name__)))
+        if len(pid) > 0: return int(pid)
+
     def __str__(self):
-        return self.__name__.replace("Pattern","")
+        return self.__class__.__name__.replace("Pattern","")
     
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -548,7 +550,6 @@ class Pattern4(_AbstractPattern):
     
   def decode(self,aligned):
     d = {k:self.decodeItem(aligned,k) for k in self.format.keys()}
-    # add "timestamp". Century is not in pattern. Setting closest to 2018.
     centuries = np.array([2000,1900])
     century = centuries[np.argmin(np.abs(centuries+int(d["year"])-2018))]
     d["timestamp"] = datetime.datetime(
@@ -572,39 +573,7 @@ class Pattern4(_AbstractPattern):
     return anon
 
 
-class Pattern5(_AbstractPattern):
-
-    # Canon
-    d_i = 0.02
-    d_j = 0.01 # 0.006, 0.005, 0.02
-    n_i = 16*2
-    n_j = 16
-    #n_i = 16*112
-    #n_j = 16+7*112
-    n_i_prototype = 16
-    n_j_prototype = 16
-    markers = [(0,0),(0,4)]#, (16,7),(16,7+4) (16,0),(16,4)
-    #repetitions = [(i*16,i*7) for i in range(1,112)]
-    #rot=[0]
-    allowUpsideDown = False
-    #allowRotation = False
-    #minCount=-1
-
-    def checkUnaligned(self, m):
-        return np.sum(m) == 2*18
-        
-    def check(self, aligned):
-        return (np.sum(np.sum(aligned,axis=1)==2) == 2
-            and np.sum(np.sum(aligned,axis=1)==1) == 14
-            #and (np.sum(aligned,axis=1) >= 1).all()
-            #and (np.sum(aligned,axis=1)<=2).all()
-        )
-        
-    def decode(self, aligned):
-        return dict(manufacturer="Canon",raw=array2str(aligned))
-
-
-patterns = {name:cls()
+patterns = {cls.pid:cls()
     for name, cls in globals().items() 
     if name.startswith("Pattern")}
 
@@ -657,8 +626,7 @@ class TDM(_AligningMixin):
         dtype = np.uint8
         shape = (self.pattern.n_i_prototype, self.pattern.n_j_prototype)
         self.aligned = np.zeros(shape, dtype)
-        for x,y in self.pattern.markers:
-            if x < shape[0] and y < shape[1]: self.aligned[x,y] = 1
+        for x,y in self.pattern.markers: self.aligned[x,y] = 1
         if aligned is not None:
             for x,y in self.pattern.codebits: 
                 self.aligned[x,y] = aligned[x,y]
@@ -686,13 +654,16 @@ class TDM(_AligningMixin):
         return matrix2str(self.aligned)
     
     def __hash__(self):
-        return hash("%s%s"%(self.pattern, self.aligned))
+        return hash("%d%s"%(
+            hash(self.pattern),
+            "".join([str(int(x)) for x in self.aligned.flat]))
+        )
         
     def __eq__(self, o):
         return hash(self) == hash(o)
     
     def __repr__(self):
-        return "<TDM of Pattern %s at %0.2f x %0.2f inches>"%(
+        return "<TDM of Pattern %s at %d x %d pixels>"%(
             self.pattern,self.atX,self.atY)
         
         

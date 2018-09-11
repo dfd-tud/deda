@@ -5,7 +5,7 @@
 
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="">
+    <meta name="description" content="Scan Anonymisierung">
     <meta name="author" content="stephan escher">
 
     <title>Deda Toolkit</title>
@@ -13,7 +13,7 @@
     <!-- CSS Import-->
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link href="../css/dedastyle.css" rel="stylesheet">
-    <link href="../css/fontawesome-all.css" rel="stylesheet">
+    <link href="../css/fontawesome.min.css" rel="stylesheet">
     <!-- EEL -->
     <script type='text/javascript' src='/eel.js'></script>
 
@@ -23,14 +23,13 @@
     <div id="wrapper" class="toggled">
         <!-- Sidebar -->
         <div id="sidebar-wrapper"></div>
-
         <!-- Page Content -->
         <div id="page-content-wrapper">
-            <div class="container-fluid">
+            <div class="container-fluid" id="content">
                 <a href="#menu-toggle" id="menu-toggle"><i class="fas fa-ellipsis-h"></i></a><a class="language" href="../scananon.html"> English</a>
                 <hr><h3> Scan Anonymisierung <i class="fas fa-cut"></i></h3><hr>
                 <br>
-                <div class="card">
+                <div class="card" id="contentheader">
                     <div class="card-body">
                         Dieser Teil ermöglicht die Anonymisierung eines gescannten Ausdrucks. Kopieren Sie den Pfad des gescannten Ausdrucks, den Sie anonymisieren möchten,
                         in das Textfeld und klicken Sie auf "Dokument anonymisieren". Das anonymisierte Dokument wird im gleichen Verzeichnis gespeichert (dokumentname_anon).
@@ -38,73 +37,23 @@
                         data-content="<u>Windows</u><ul><li>Shift+Rechtsklick auf Datei</li><li>Pfad kopieren</li><li>Strg+v im Textfeld</ul></li>
                         <u>Linux</u><ul><li>Strg+c auf Datei</li><li>Strg+v im Textfeld</li></ul>"><i class="far fa-lightbulb"></i></i></a>
                         <br><br>
-                        <form>
-                          <div class="form-group">
-                            <input id='file_selector' class="form-control" placeholder='Geben Sie hier den Dateipfad des gescannten Ausdruckes ein.'></input>
-                            <!--input id='save_selector' style="margin-top:5px;" class="form-control" placeholder='Optional: type save path of anon image (default: same directory)'></input-->
-                          </div>
-                          <a href='javascript:void()' class="btn btn-secondary" onclick='anonymize_scan()'>Dokument anonymisieren</a>
-                          <i class="fas fa-spinner fa-pulse" id="loading" style="visibility:hidden;margin-left:10px;"></i>
+                        <form id="headerform">
+                            <div class="form-group">
+                                <input id="file_selector" class="form-control" placeholder='Dateipfad des gescannten Ausdruckes eingeben'></input>
+                            </div>
+                            <a href="#" class="btn btn-secondary" onclick='anonymizeScan()'><i class="fas fa-cut"></i> Dokument anonymisieren</a>
                         </form>
                     </div>
                 </div>
-                <br>
-                <div class="alert alert-danger" id="file_info" role="alert" style="visibility:hidden;"></div>
-                <div class="alert alert-success" id="anon_info" role="alert" style="visibility:hidden;"></div>
-                <br>
-                <span class='label label-info' id="result"></span>
-                <br><br><br><br>
             </div>
         </div>
     </div>
 
     <!-- JavaScript Ext-->
     <script src="../js/jquery.min.js"></script>
-    <script src="../js/bootstrap.bundle.min.js"></script>
-
-    <!-- Misc -->
-    <script type="text/javascript">
-        $("#menu-toggle").click(function(e) {
-            e.preventDefault();
-            $("#wrapper").toggleClass("toggled");
-        });
-        $(document).ready(function(){
-            $('#sidebar-wrapper').load('sidebar.html');
-        });
-        $('[data-toggle="popover"]').popover({
-            trigger: 'focus'
-        });
-    </script>
-
-    <!-- Scan Anonymity -->
-    <script type="text/javascript">
-
-        async function anonymize_scan() {
-            document.getElementById('loading').style["visibility"] = "";
-            let file = document.getElementById("file_selector").value;
-            //let save_path = document.getElementById("save_selector").value;
-            let save_path = '';
-            let file_info = document.getElementById("file_info");
-            let anon_info = document.getElementById("anon_info");
-            anon_info.style["visibility"] = "hidden";
-            file_info.style["visibility"] = "hidden";
-            // Send to Python
-            let info = await eel.anonScanAction(file, save_path)();
-            if(info != ''){
-                file_info.style["visibility"] = "";
-                file_info.innerHTML = info;
-            }
-            document.getElementById('loading').style["visibility"] = "hidden";
-        }
-
-        eel.expose(print_result);
-        function print_result(info, result) {
-            let anon_info = document.getElementById("anon_info");
-            anon_info.style["visibility"] = "";
-            anon_info.innerHTML = info;
-            document.getElementById("result").innerHTML = result;
-        }
-    </script>
+    <script src="../js/popper.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+    <script src="../js/deda.js"></script>
 
 </body>
 

@@ -5,7 +5,7 @@
 
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="">
+    <meta name="description" content="Print Anonymization">
     <meta name="author" content="stephan escher">
 
     <title>Deda Toolkit</title>
@@ -13,7 +13,7 @@
     <!-- CSS Import-->
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/dedastyle.css" rel="stylesheet">
-    <link href="css/fontawesome-all.css" rel="stylesheet">
+    <link href="css/fontawesome.min.css" rel="stylesheet">
     <!-- EEL -->
     <script type='text/javascript' src='/eel.js'></script>
 
@@ -23,118 +23,60 @@
     <div id="wrapper" class="toggled">
         <!-- Sidebar -->
         <div id="sidebar-wrapper"></div>
-
         <!-- Page Content -->
         <div id="page-content-wrapper">
-            <div class="container-fluid">
+            <div class="container-fluid" id="content">
                 <a href="#menu-toggle" id="menu-toggle"><i class="fas fa-ellipsis-h"></i></a><a class="language" href="de/printanon2.html"> Deutsch </a>
-                <hr><h3> Print Anonymization <i class="fas fa-print"></i></h3><hr>
-                <br>
-                <div id="card1" class="card">
-                    <div class="card-body">
-                          <b>1.</b> First generate a printing mask for the specific printer you want to use. Go to: <a href="printanon.html"> <i class="fas fa-link"></i> Generate Print Mask</a>
-                    </div>
-                </div><br/>
-                <div id="card1" class="card">
-                    <div class="card-body">
-                          <b>2.</b> Save your document to be anonymized as a PostScript document (*.ps), e.g. using pdf2ps under Linux. Some programs also offer an option for "export as" or "save as" as *.ps file.
-                      </div>
-                  </div><br>
-                  <div id="card1" class="card">
-                      <div class="card-body">
-                          <form>
-                              <b>3.</b> Load the document in PostScript format (step 2) and the generated printer mask (step 1) and create an anonymous document. This document is saved as "documentname_masked.ps"
-                              in the same folder as the document. Additional the settings file is saved as "calibration_masked.txt". Print this file borderless and proceed to step 4.
-                              <a tabindex="0" role="button" data-toggle="popover" data-trigger="focus" data-html="true" title="Copy file path"
-                              data-content="<u>Windows</u><ul><li>Shift+right click on file</li><li>copy path</li><li>Strg+v in text field</ul></li>
-                              <u>Linux</u><ul><li>Strg+c on file</li><li>Strg+v in text field</li></ul>"><i class="far fa-lightbulb"></i></i></a>
-                              <br>
-                              <div class="form-group" style="margin-top:20px;">
-                                    <input id='file_selector' class="form-control" placeholder='Type file path of the original document (*.ps)'></input>
-                                    <input id='mask_selector' style="font-size:0.9rem;margin-bottom:10px;max-width:550px;" class="form-control" placeholder='Type file path of generated printer mask (*.json)'></input>
-                                    <div class="form-row" >
-                                        <div class="col-md-10"><a href='javascript:void()' class="btn btn-secondary" onclick='generate_file()'><i class="fas fa-pencil-alt"></i> Generate Document</a></div>
-                                        <div class="col-md-2"><i class="fas fa-spinner fa-pulse" id="loading" style="visibility:hidden;margin-left:10px;"></i></div>
-                                    </div>
-                              </div>
-                              <br>
-                             <b>4.</b> Scan artifacts can cause a small offset between the original and masked yellow dots. To fix this, scan the anonymized print and check the yellow dot patterns.
-                             If there is an offset - vary x and y to overlay the masking points exactly with the original yellow points. Repeat step 3 with x and y and click <i>Generate Document</i> again.
-                             The dot radius describes the size of a tracking dot to be printed.
-                              <div class="form-group">
-                                <div class="form-row" style="margin:20px;max-width:300px;">
-                                    <input id="x" step="0.01" type="number" style="font-size:0.9rem;" class="form-control" placeholder='x offset (0)'></input>
-                                    <input id="y" step="0.01" type="number" style="font-size:0.9rem;" class="form-control" placeholder='y offset (0)'></input>
-                                    <input id="dotradius" step="0.001" type="number" style="font-size:0.9rem;" class="form-control" placeholder='dot radius (0.004in)'></input>
-                              </div>
+                <hr><h3> Print Anonymization <i class="fas fa-print"></i></h3><hr><br>
+                <div class="card" id="contentheader">
+                  <div class="card-body">
+                      <form>
+                          <b>1.</b> First <a href="printanon.html"><i class="fas fa-link"></i> generate a print mask</a>
+                          for the specific printer you want to use. <br><br>
+                          <b>2.</b>Load generated printer mask (.json) and the document (PDF) to generate an anonymous document.
+                          This document is saved as "documentname_masked.pdf" in the same folder as the document.
+                          Additional an settings file is saved as "calibration_masked.txt".
+                          Print the anonymous document borderless and proceed to step 3.
+                          <a tabindex="0" role="button" data-toggle="popover" data-trigger="focus" data-html="true" title="Copy file path"
+                          data-content="<u>Windows</u><ul><li>Shift+right click on file</li><li>copy path</li><li>Strg+v in text field</ul></li>
+                          <u>Linux</u><ul><li>Strg+c on file</li><li>Strg+v in text field</li></ul>"><i class="far fa-lightbulb"></i></i></a>
+                          <br>
+                          <div class="form-group" style="margin-top:20px;">
+                                <input id='file_selector' class="form-control" placeholder='Type file path of the original document (*.pdf)'></input>
+                                <input id='mask_selector' class="form-control" placeholder='Type file path of generated printer mask (*.json)'></input>
+                                <div class="row form-row" >
+                                    <a style="margin-left:5px;" href="#" class="btn btn-secondary" onclick='generateAnonPrintFile()'><i class="fas fa-cogs"></i> Generate Document</a>
+                                    <div id="loading_div" style="margin-left:10px;margin-top:7px;"></div>
+                                </div>
                           </div>
-                        </form>
-                    </div>
+                          <br>
+                         <b>3.</b> Scan artifacts can cause a small offset between the original and masked yellow dots. To fix this, scan the anonymized print and check the yellow dot patterns.
+                         If there is an offset - vary x and y to overlay the masking points exactly with the original yellow points. Repeat step 2 with x and y set and click <i>Generate Document</i> again.
+                         The dot radius describes the size of a tracking dot to be printed.
+                          <div class="form-group">
+                            <div class="form-row" style="margin:20px;">
+                                <div class="col-md-4" style="max-width:300px;">
+                                    <input id="x" step="0.01" type="number" class="form-control" placeholder='x offset'></input>
+                                    <input id="y" step="0.01" type="number" class="form-control" placeholder='y offset'></input>
+                                    <input id="dotradius" step="0.001" type="number" class="form-control" placeholder='radius (0.004in)'></input>
+                                </div>
+                                <div class="col-md-4" style="margin-left: 20px;">
+                                    <img src="misc/x-y.png" style="max-height: 120px;"></img>
+                                </div>
+                          </div>
+                      </div>
+                    </form>
+                  </div>
                 </div>
-                <br>
-                <div class="alert alert-danger" id="file_info" role="alert" style="visibility:hidden;"></div>
-                <div class="alert alert-success" id="result" role="alert" style="visibility:hidden;"></div>
-                <br>
-                <span class='label label-info' id="result2"></span>
-                <br><br><br><br>
             </div>
         </div>
     </div>
 
     <!-- JavaScript Ext-->
     <script src="js/jquery.min.js"></script>
-    <script src="js/bootstrap.bundle.min.js"></script>
-
-    <!-- Misc -->
-    <script type="text/javascript">
-        $("#menu-toggle").click(function(e) {
-            e.preventDefault();
-            $("#wrapper").toggleClass("toggled");
-        });
-        $(document).ready(function(){
-            $('#sidebar-wrapper').load('sidebar.html');
-        });
-        $('[data-toggle="popover"]').popover({
-            trigger: 'focus'
-        });
-    </script>
-
-
-    <!-- Anonymization -->
-    <script type="text/javascript">
-
-        async function generate_file() {
-            document.getElementById('loading').style["visibility"] = '';
-            let page = document.getElementById('file_selector').value;
-            let mask = document.getElementById('mask_selector').value;
-            let x = document.getElementById('x').value;
-            let y = document.getElementById('y').value;
-            let dotradius = document.getElementById('dotradius').value;
-            let file_info = document.getElementById('file_info');
-            let result = document.getElementById('result');
-            file_info.innerHTML = '';
-            result.innerHTML = '';
-
-            file_info.style["visibility"] = "hidden";
-            result.style["visibility"] = "hidden";
-            // Send to Python
-            let info = await eel.applyMask(page, mask, x, y, dotradius)();
-            if(info == 'Done'){
-                result.style["visibility"] = '';
-                result.innerHTML = 'Done. Masked document was generated and saved.<br>';
-            }
-            else if(info != ''){
-                file_info.style["visibility"] = '';
-                file_info.innerHTML = info;
-            }
-            document.getElementById('loading').style["visibility"] = 'hidden';
-        }
-        
-        eel.expose(print_result);
-        function print_result(result) {
-            document.getElementById("result2").innerHTML = result;
-        }
-    </script>
+    <script src="js/popper.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/deda.js"></script>
 
 </body>
 
