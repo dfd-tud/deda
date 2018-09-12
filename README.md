@@ -9,7 +9,7 @@ If you use this software, please cite the paper:
 Timo Richter, Stephan Escher, Dagmar Schönfeld, and Thorsten Strufe. 2018. Forensic Analysis and Anonymisation of Printed Documents. In Proceedings of the 6th ACM Workshop on Information Hiding and Multimedia Security (IH&MMSec '18). ACM, New York, NY, USA, 127-138. DOI: https://doi.org/10.1145/3206004.3206019
 
 
-#### 0. Install
+#### Installation
 
 * Install Python 3
 * Install Deda
@@ -21,25 +21,34 @@ Or from current directory:
 `$ pip3 install wand`
 
 
-#### 1. Reading tracking data   
+#### Graphical User Interface
+
+* To open the GUI type:
+`$ deda_gui`
+
+
+#### Terminal Application
+
+
+##### 1. Reading tracking data   
 
 Tracking data can be read and sometimes be decoded from a scanned image. For good results the input shall use a lossless compression (e.g. png) and 300 dpi. Make sure to set a neutral contrast 
 `$ deda_parse_print INPUTFILE`
 
 
-#### 2. Find a divergent printer in a set of scanned documents   
+##### 2. Find a divergent printer in a set of scanned documents   
 
 `$ deda_compare_prints INPUT1 INPUT2 [INPUT3] ...`
 
 
-#### 3. Analysing an unknown tracking pattern
+##### 3. Analysing an unknown tracking pattern
 
 New patterns might not be recognised by parse_print. The dots can be extracted
 for further analysis.      
 `$ deda_extract_yd INPUTFILE`
 
 
-#### 4. Create your own tracking dots
+##### 4. Create your own tracking dots
 
 If you want to create your own tracking dots matrix and add it to a pdf
 document, pass the contents as parameters (see `deda_create_dots -h`).
@@ -48,13 +57,13 @@ document, pass the contents as parameters (see `deda_create_dots -h`).
 The calibration page (`$ deda_anonmask_create -w`) may be used as an input.
 
 
-#### 5. Anonymise a scanned image
+##### 5. Anonymise a scanned image
 
 This (mostly) removes tracking data from a scan:   
 `$ deda_clean_document INPUTFILE OUTPUTFILE`
 
 
-#### 6. Anonymise a document for printing
+##### 6. Anonymise a document for printing
 
 * Save your document as a PDF file and call it DOCUMENT.PDF.
 
@@ -78,7 +87,7 @@ passed to `deda_anonmask_apply` as parameters.
 Note that if DOCUMENT.PDF contains graphics with white or light coloured parts, these can only be masked if "wand" is installed (see above).
 
 
-#### 7. Troubleshooting
+#### Troubleshooting
 
 ##### deda_parse_print: command not found
 
