@@ -20,13 +20,14 @@ Or from current directory:
 * Optional requirement by deda_anonmask_apply (GNU/Linux only):
 `$ pip3 install wand`
 
-
+----
 #### Graphical User Interface
 
 * To open the GUI type:
 `$ deda_gui`
 
 
+----
 #### Terminal Application
 
 
@@ -87,6 +88,7 @@ passed to `deda_anonmask_apply` as parameters.
 Note that if DOCUMENT.PDF contains graphics with white or light coloured parts, these can only be masked if "wand" is installed (see above).
 
 
+----
 #### Troubleshooting
 
 ##### deda_parse_print: command not found
