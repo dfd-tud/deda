@@ -9,6 +9,7 @@ If you use this software, please cite the paper:
 Timo Richter, Stephan Escher, Dagmar Schönfeld, and Thorsten Strufe. 2018. Forensic Analysis and Anonymisation of Printed Documents. In Proceedings of the 6th ACM Workshop on Information Hiding and Multimedia Security (IH&MMSec '18). ACM, New York, NY, USA, 127-138. DOI: https://doi.org/10.1145/3206004.3206019
 
 
+----
 #### Installation
 
 * Install Python 3
