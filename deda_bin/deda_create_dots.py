@@ -29,6 +29,9 @@ class Main(object):
         parser.add_argument("--hour", type=int, metavar="NN", default=11)
         parser.add_argument("--minutes", type=int, metavar="NN", default=11)
         parser.add_argument("--dotradius", type=float, metavar="INCHES", default=None, help='default=%f'%AnonmaskApplierTdm.dotRadius)
+
+        parser.add_argument("--debug", action="store_true", default=False, help='DEBUG: Print magenta dots instead of yellow ones')
+
         parser.add_argument("page", type=str, metavar="PDF_DOCUMENT", help='Path to page that the dots shall be added to')
         self.args = parser.parse_args()
 
@@ -47,7 +50,7 @@ class Main(object):
         ))
         print(tdm)
         OUTFILE = "new_dots.pdf"
-        aa = AnonmaskApplierTdm(tdm,dotRadius=self.args.dotradius)
+        aa = AnonmaskApplierTdm(tdm,dotRadius=self.args.dotradius,debug=self.args.debug)
         with open(OUTFILE,"wb") as pdfout:
             with open(self.args.page,"rb") as pdfin:
                 pdfout.write(aa.apply(pdfin.read()))
