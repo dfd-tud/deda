@@ -345,7 +345,7 @@ class AnonmaskApplierCommon(object):
             # remove dots on black spots
             allDots = [(x,y) for x,y in allDots 
                 if int(y*dpi)>=im.shape[0] or int(x*dpi)>=im.shape[1] 
-                or (im[int(y*dpi),int(x*dpi)] != (0,0,0)).any()]
+                or (im[-int(y*dpi),int(x*dpi)] != (0,0,0)).any()]
             
         for x,y in allDots:
             c.circle(x*72,h-y*72,self.dotRadius*72,stroke=0,fill=1)
