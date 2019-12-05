@@ -119,3 +119,9 @@ If there are really no tracking dots, you can either create your own ones (`deda
 This may be caused by the eel dependency which is needed for the GUI. Try
 `$ sudo apt-get install build-essential autoconf libtool pkg-config python3.6-dev gcc && pip3 install --user eel`
 
+
+##### wand.exceptions.PolicyError: attempt to perform an operation not allowed by the security policy PDF' @ error/constitute.c/IsCoderAuthorized/408
+
+This is being caused by ImageMagick. Either remove Wand (`pip3 uninstall wand`) or add `<policy domain="coder" rights="read | write" pattern="PDF" />` just before `</policymap>` in /etc/ImageMagick-*/policy.xml. See also https://stackoverflow.com/questions/52998331/imagemagick-security-policy-pdf-blocking-conversion.
+
+
