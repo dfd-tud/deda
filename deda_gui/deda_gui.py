@@ -406,13 +406,11 @@ def main():
     #---
     #--- Start GUI
     #---
-    web_app_options = {
-	    'mode': '', #"chrome", #or "chrome-app"
-	    'port': 8080,
-	    #'chromeFlags': ["--size=(1024, 800)"]
-    }
+    # options: see https://github.com/samuelhwilliams/Eel#app-options
+    # mode: #"chrome", #or "chrome-app"
+    # chromeFlags: ["--size=(1024, 800)"]
 
-    eel.start('index.html', options=web_app_options)
+    eel.start('index.html',  mode='', port=8080)
 
 
 if __name__ == '__main__':
