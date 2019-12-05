@@ -14,12 +14,16 @@ Timo Richter, Stephan Escher, Dagmar Schönfeld, and Thorsten Strufe. 2018. Fore
 
 * Install Python 3
 * Install Deda
+
 From PyPI:
 `$ pip3 install --user deda`
+
 Or from current directory:
 `$ pip3 install --user .`
-* Optional requirement by deda_anonmask_apply (GNU/Linux only):
-`$ pip3 install wand`
+* Optional requirement by deda_anonmask_apply (Unix and GNU/Linux only):
+`$ pip3 install --user wand`
+
+Without Wand, pages containing white areas on images cannot be anonymised.
 
 ----
 #### Graphical User Interface
