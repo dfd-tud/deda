@@ -20,7 +20,6 @@ except ImportError: from PIL import Image
 try: import wand
 except ImportError: pass
 else: from wand.image import Image as WandImage
-import libdeda.pypdf2patch
 from PyPDF2 import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib import pagesizes
