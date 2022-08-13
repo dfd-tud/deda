@@ -21,7 +21,7 @@ try: import wand
 except ImportError: pass
 else: from wand.image import Image as WandImage
 import libdeda.pypdf2patch
-from PyPDF2 import PdfFileReader, PdfFileWriter
+from PyPDF2 import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib import pagesizes
 from reportlab.pdfbase import pdfdoc 
@@ -333,8 +333,8 @@ class AnonmaskApplierCommon(object):
             # PyPDF2 page to cv2 image
             dpi = 300
             pageio = BytesIO()
-            pageWriter = PdfFileWriter()
-            pageWriter.addPage(page)
+            pageWriter = PdfWriter()
+            pageWriter.add_page(page)
             pageWriter.write(pageio)
             pageio.seek(0)
             with WandImage(file=pageio,format="pdf",resolution=dpi) as wim:
@@ -359,14 +359,14 @@ class AnonmaskApplierCommon(object):
         """
         Reads a PDF as binary string and sets with and height of each page.
         """
-        input_ = PdfFileReader(BytesIO(pdfin))
-        output = PdfFileWriter()
+        input_ = PdfReader(BytesIO(pdfin))
+        output = PdfWriter()
         outIO = BytesIO()
-        for p_nr in range(input_.getNumPages()):
-            page = input_.getPage(p_nr)
-            outPage = output.addBlankPage(width, height)
-            outPage.mergePage(page)
-            outPage.compressContentStreams()
+        for p_nr in range(len(input_.pages)):
+            page = input_.pages[p_nr]
+            outPage = output.add_blank_page(width, height)
+            outPage.merge_page(page)
+            outPage.compress_content_streams()
         output.write(outIO)
         outIO.seek(0)
         return outIO.read()
@@ -388,23 +388,23 @@ class AnonmaskApplierCommon(object):
                 with open("input.pdf","rb") as fp_in:
                     fp_out.write(pdfWatermark(pf_in.read(), func))
         """
-        output = PdfFileWriter()
+        output = PdfWriter()
         if not isinstance(pdfin, bytes):
             with open(pdfin,"rb") as fp: pdfin = fp.read()
-        input_ = PdfFileReader(BytesIO(pdfin))
+        input_ = PdfReader(BytesIO(pdfin))
         
-        for p_nr in range(input_.getNumPages()):
-            page = input_.getPage(p_nr)
-            mask = PdfFileReader(BytesIO(maskCreator(page))).getPage(0)
+        for p_nr in range(len(input_.pages)):
+            page = input_.pages[p_nr]
+            mask = PdfReader(BytesIO(maskCreator(page))).pages[0]
             if foreground:
-                page.mergePage(mask)
-                output.addPage(page)
+                page.merge_page(mask)
+                output.add_page(page)
             else:
                 maskCp = output.addBlankPage(page.mediaBox.getWidth(),
                     page.mediaBox.getHeight())
-                maskCp.mergePage(mask)
-                maskCp.mergePage(page)
-            output.getPage(p_nr).compressContentStreams()
+                maskCp.merge_page(mask)
+                maskCp.merge_page(page)
+            output.pages[p_nr].compress_content_streams()
         
         outIO = BytesIO()
         output.write(outIO)
