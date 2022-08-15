@@ -271,7 +271,7 @@ def main():
                         fp.write(mask)
                     return 'Done. Mask was generated and saved as %smask.json'%path
                 except:
-                    return 'An Error occoured.'
+                    return 'An Error occurred.'
             else:
                 return 'Not a valid Image. Currently only jpg, png, tiff or bmp are allowed.'
         else:
@@ -327,7 +327,7 @@ def main():
             eel.printAnonMaskResult(info, result)
             return ''
         except:
-            return 'An Error occoured.'
+            return 'An Error occurred.'
 
     #---
     #--- Apply Print Mask
